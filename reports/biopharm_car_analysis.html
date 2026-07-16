@@ -1,0 +1,418 @@
+<title>BioPharmCatalyst Pricing Analysis</title>
+<style>
+  .viz-root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --good: #0ca30c;
+    --critical: #d03b3b;
+    --blue: #2a78d6;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    background: var(--page);
+  }
+  @media (prefers-color-scheme: dark) {
+    .viz-root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --good: #0ca30c;
+      --critical: #d03b3b;
+      --blue: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
+    --text-secondary: #c3c2b7; --text-muted: #898781; --grid: #2c2c2a;
+    --axis: #383835; --border: rgba(255,255,255,0.10); --blue: #3987e5;
+  }
+  :root[data-theme="light"] .viz-root {
+    --surface-1: #fcfcfb; --page: #f9f9f7; --text-primary: #0b0b0b;
+    --text-secondary: #52514e; --text-muted: #898781; --grid: #e1e0d9;
+    --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --blue: #2a78d6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; line-height: 1.5; max-width: 760px; }
+  .caveat {
+    margin-top: 14px; padding: 12px 14px; border-radius: 8px;
+    background: color-mix(in srgb, var(--critical) 8%, var(--surface-1));
+    border: 1px solid color-mix(in srgb, var(--critical) 25%, transparent);
+    font-size: 13px; color: var(--text-secondary); line-height: 1.55;
+  }
+  .caveat b { color: var(--text-primary); }
+  section { margin-top: 40px; }
+  h2 { font-size: 15px; font-weight: 650; margin: 0 0 4px; }
+  .section-note { color: var(--text-muted); font-size: 12.5px; margin: 0 0 16px; line-height: 1.5; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tile .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .tile .value { font-size: 24px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .value.good { color: var(--good); }
+  .tile .value.critical { color: var(--critical); }
+  .chart-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 20px 12px;
+  }
+  .legend { display: flex; gap: 18px; align-items: center; margin-bottom: 8px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+  .dot { cursor: pointer; }
+  .median-tick { stroke-width: 2.5; }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 50;
+    background: var(--text-primary); color: var(--page);
+    font-size: 12px; line-height: 1.45; padding: 8px 10px; border-radius: 7px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25); max-width: 260px; opacity: 0; transition: opacity 0.08s;
+  }
+  .tooltip b { display: block; margin-bottom: 2px; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.data-table th {
+    text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.02em; padding: 8px 10px; border-bottom: 1px solid var(--grid);
+    position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  table.data-table td.status-approved { color: var(--good); font-weight: 600; }
+  table.data-table td.status-crl { color: var(--critical); font-weight: 600; }
+  .table-scroll { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-btn {
+    font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-secondary); cursor: pointer;
+  }
+  .filter-btn.active { background: var(--text-primary); color: var(--page); border-color: var(--text-primary); }
+  .phase-scheme { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); }
+  .phase-scheme h3 { font-size: 13.5px; color: var(--text-primary); margin: 18px 0 6px; }
+  .phase-scheme h3:first-child { margin-top: 0; }
+  .phase-scheme code { background: var(--grid); padding: 1px 5px; border-radius: 4px; font-size: 12px; color: var(--text-primary); }
+  .phase-scheme ol, .phase-scheme ul { margin: 6px 0 6px 18px; padding: 0; }
+  .phase-scheme li { margin-bottom: 4px; }
+  .pill-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12.5px; }
+  .pill-table th, .pill-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+  .pill-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  footer { margin-top: 48px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--grid); padding-top: 16px; }
+</style>
+
+<div class="viz-root">
+<div class="wrap">
+
+  <h1>BioPharmCatalyst small-molecule pricing analysis</h1>
+  <p class="subtitle">
+    Cumulative abnormal return (CAR, T-2..T+2 vs. XBI) around FDA <b>Approved</b>
+    or <b>CRL</b> (Complete Response Letter) catalysts, small-molecule/peptide
+    drugs only, filtered from the BioPharmCatalyst scrape
+    (<code>Tejas1415/Web-Scrape-Stock-Ticker-and-Company-Name-Datasets</code>).
+  </p>
+  <div class="caveat">
+    <b>Coverage caveats, read before using these numbers:</b> the source file
+    covers <b>2009-07-05 to 2020-01-14 only</b> &mdash; not the trailing 10 years as
+    originally hoped; it is a static scrape, stale by ~6 years. Of 462 unique
+    small-molecule/peptide Approved-or-CRL events (363 rows after PubChem
+    filtering), <b>249 (68.6%) have priceable Yahoo Finance history</b> &mdash; the
+    other 114 fail because 55 tickers were delisted/acquired long enough ago
+    that Yahoo has purged their price history entirely (e.g. ARNA, CLVS, SGEN,
+    MYL, AGN &mdash; all real M&amp;A exits), not because of a pipeline bug.
+  </div>
+
+  <section>
+    <h2>Headline result</h2>
+    <p class="section-note">Mann-Whitney U p = 5.4e-8, Welch t-test p = 6.6e-6 &mdash; both far past conventional significance, on real sample sizes (not the n=10-83 the EDGAR-matched pipeline was stuck at).</p>
+    <div class="tiles">
+      <div class="tile"><div class="label">Priced events</div><div class="value">249</div></div>
+      <div class="tile"><div class="label">Approved &middot; median CAR</div><div class="value good">+0.4%</div></div>
+      <div class="tile"><div class="label">CRL &middot; median CAR</div><div class="value critical">&minus;11.7%</div></div>
+      <div class="tile"><div class="label">Mann-Whitney p</div><div class="value">5.4e-8</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>CAR by outcome</h2>
+    <p class="section-note">Each dot is one event, jittered horizontally. Thick tick = median. Approval is a non-event for price (already priced in); a CRL is the real information shock.</p>
+    <div class="chart-card">
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:var(--good)"></span>Approved (n=209)</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--critical)"></span>CRL (n=40)</div>
+      </div>
+      <svg id="stripChart" viewBox="0 0 900 340" width="100%" style="overflow: visible;"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>CAR over time</h2>
+    <p class="section-note">Same events plotted by catalyst date &mdash; shows both the outcome asymmetry and where Yahoo's coverage thins out (sparser before ~2013).</p>
+    <div class="chart-card">
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:var(--good)"></span>Approved</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--critical)"></span>CRL</div>
+      </div>
+      <svg id="timeChart" viewBox="0 0 900 300" width="100%" style="overflow: visible;"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>All priced events</h2>
+    <p class="section-note">Table view of the same 249 events.</p>
+    <div class="filter-row">
+      <button class="filter-btn active" data-filter="all">All (249)</button>
+      <button class="filter-btn" data-filter="Approved">Approved (209)</button>
+      <button class="filter-btn" data-filter="CRL">CRL (40)</button>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr><th>Ticker</th><th>Drug</th><th>Status</th><th>Catalyst date</th><th>CAR</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Proposal: separating the full dataset into trial phases</h2>
+    <p class="section-note">The user's core question &mdash; the raw file's stage column mixes phase labels with regulatory-decision labels in one field, with no explicit phase-of-pivotal-trial link for Approved/CRL rows.</p>
+    <div class="phase-scheme">
+
+      <h3>What the "Approved or CRL" column actually contains</h3>
+      <p>It's not an outcome column and a phase column layered together by
+      accident &mdash; it's a single <b>catalyst-type</b> field with 13 distinct
+      values in the cleaned data:</p>
+      <table class="pill-table">
+        <tr><th>Value</th><th>Count</th><th>What it means</th></tr>
+        <tr><td>Phase 1 / 1b / 1-2</td><td>259</td><td>early readout, not yet pivotal</td></tr>
+        <tr><td>Phase 2 / 2a / 2b</td><td>566</td><td>mid-stage readout</td></tr>
+        <tr><td>Phase 2/3</td><td>23</td><td>seamless/adaptive trial readout</td></tr>
+        <tr><td>Phase 3</td><td>689</td><td>pivotal-trial readout</td></tr>
+        <tr><td>NDA / BLA Filing, PDUFA</td><td>10</td><td>regulatory-process milestones, not trial results</td></tr>
+        <tr><td>Approved</td><td>513</td><td>terminal regulatory decision (positive)</td></tr>
+        <tr><td>CRL</td><td>120</td><td>terminal regulatory decision (negative)</td></tr>
+      </table>
+
+      <h3>Why Approved/CRL already <em>is</em> effectively "post-Phase-3"</h3>
+      <p>FDA approval decisions are made almost entirely on pivotal Phase 3
+      data (accelerated-approval-off-Phase-2 is the exception, not the rule).
+      So the Approved/CRL slice used above is already a reasonable proxy for
+      "Phase 3 pivotal outcome" &mdash; this is the same population the old
+      EDGAR-matched pipeline was trying to approximate at n=47, just reached
+      here directly through a curated regulatory-decision date instead of
+      guessing a trial-completion-to-filing match. That's the main reason this
+      source is a real improvement, not just a different dataset.</p>
+
+      <h3>Recommended linking scheme, to get an explicit phase per event</h3>
+      <ol>
+        <li><b>Primary (free, no external calls):</b> for every Approved/CRL
+        row, look back within this same CSV for the most recent prior row
+        sharing <code>Ticker</code> + a fuzzy-matched <code>Drug Name</code>
+        (strip parentheticals/trial-name suffixes the same way the PubChem
+        retry step did) whose status is Phase 1/2/3. That row's phase is the
+        pivotal phase. Cheap, deterministic, no rate limits &mdash; the same trick
+        that made PubChem name-matching recover 267 of 462 drugs here.</li>
+        <li><b>Validation on a sample:</b> cross-check ~30 linked pairs against
+        <a href="#" style="color:inherit">Drugs@FDA</a> (openFDA, free) by brand/generic
+        name &mdash; it returns submission type (NDA/BLA) and approval history but
+        not trial phase directly, so it validates the <i>drug identity</i> match,
+        not the phase itself.</li>
+        <li><b>Fallback for unlinked rows:</b> ClinicalTrials.gov search by
+        intervention name + <code>phase=PHASE3</code> + status Completed, dated
+        before the Approved/CRL catalyst date &mdash; same idea as the CTOD/EDGAR
+        pipeline in the other project, but only needed for whatever step 1
+        can't resolve, which should be a minority.</li>
+      </ol>
+
+      <h3>What this unlocks beyond the Approved/CRL slice done here</h3>
+      <p>The 1,547 Phase 1/1b/1-2/2/2a/2b/2-3/3 rows have no explicit
+      success/failure label &mdash; only free-text <code>Catalyst Description</code>
+      ("met its primary endpoint" vs. "did not meet&hellip;"). A simple keyword
+      classifier on that text (same result-language approach used for EDGAR
+      filing scoring in the other project) would let mid-phase readouts be
+      priced the same way as Approved/CRL here &mdash; extending this analysis to
+      Phase 1/2 catalysts, not just terminal regulatory decisions.</p>
+    </div>
+  </section>
+
+  <footer>
+    Source: BioPharmCatalyst scrape via GitHub (Tejas1415), pulled 2026-07-15.
+    Pricing: yfinance daily closes, market-model CAR vs. XBI, T-2..T+2 window
+    (same estimator as the CTOD/EDGAR project &mdash; <code>short_window_car()</code>).
+    Small-molecule/peptide filter: PubChem MW &le; 8000 Da on cleaned drug-name
+    candidates. Code: <code>scripts/25-28_biopharmcatalyst_*.py</code> in
+    <code>hedgefund-analysis</code>.
+  </footer>
+
+</div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = [{"ticker":"ABBV","drug":"Elagolix","status":"Approved","catalyst_date":"2018-07-24","car":0.06598,"raw_return":0.04436,"benchmark_return":-0.02749},{"ticker":"ABBV","drug":"IMBRUVICA","status":"Approved","catalyst_date":"2015-01-29","car":-0.02467,"raw_return":-0.0339,"benchmark_return":-0.03776},{"ticker":"ABBV","drug":"IMBRUVICA (ibrutinib)","status":"Approved","catalyst_date":"2018-08-27","car":-0.0194,"raw_return":-0.00061,"benchmark_return":0.02947},{"ticker":"ABBV","drug":"Ibrutinib","status":"Approved","catalyst_date":"2013-11-13","car":-0.00145,"raw_return":0.00854,"benchmark_return":0.02632},{"ticker":"ABBV","drug":"Imbruvica","status":"Approved","catalyst_date":"2014-02-12","car":0.01769,"raw_return":0.03764,"benchmark_return":0.03917},{"ticker":"ABBV","drug":"Imbruvica","status":"Approved","catalyst_date":"2014-07-19","car":-0.00958,"raw_return":0.01547,"benchmark_return":0.07589},{"ticker":"ABBV","drug":"Imbruvica","status":"Approved","catalyst_date":"2017-01-19","car":0.00486,"raw_return":-0.01662,"benchmark_return":-0.04062},{"ticker":"ABBV","drug":"Imbruvica","status":"Approved","catalyst_date":"2017-08-02","car":0.00851,"raw_return":0.00781,"benchmark_return":-0.01894},{"ticker":"ABBV","drug":"Imbruvica and Gazyva - iLLUMINATE","status":"Approved","catalyst_date":"2019-01-28","car":-0.1224,"raw_return":-0.10616,"benchmark_return":0.03146},{"ticker":"ABBV","drug":"VIEKIRA PAK","status":"Approved","catalyst_date":"2014-12-19","car":-0.02586,"raw_return":-0.01379,"benchmark_return":0.02731},{"ticker":"ABBV","drug":"Venclexta","status":"Approved","catalyst_date":"2018-11-21","car":-0.06267,"raw_return":-0.05779,"benchmark_return":0.00465},{"ticker":"ABBV","drug":"Venclexta (MURANO)","status":"Approved","catalyst_date":"2018-06-11","car":-0.02212,"raw_return":-0.024,"benchmark_return":-0.00603},{"ticker":"ABBV","drug":"Venetoclax and obinutuzumab","status":"Approved","catalyst_date":"2019-05-15","car":0.0371,"raw_return":0.02595,"benchmark_return":-0.01621},{"ticker":"ACAD","drug":"Pimavanserin","status":"Approved","catalyst_date":"2016-04-29","car":-0.00202,"raw_return":-0.08032,"benchmark_return":-0.05549},{"ticker":"ACRS","drug":"ESKATA (hydrogen peroxide)","status":"Approved","catalyst_date":"2017-12-15","car":-0.03291,"raw_return":-0.04155,"benchmark_return":-0.00116},{"ticker":"AGIO","drug":"IDHIFA (enasidenib) - AG-221","status":"Approved","catalyst_date":"2017-08-01","car":0.14417,"raw_return":0.12111,"benchmark_return":-0.02426},{"ticker":"AGIO","drug":"Ivosidenib","status":"Approved","catalyst_date":"2018-07-20","car":-0.03989,"raw_return":-0.06229,"benchmark_return":-0.02591},{"ticker":"AGIO","drug":"Ivosidenib","status":"Approved","catalyst_date":"2019-05-02","car":-0.06701,"raw_return":-0.05639,"benchmark_return":0.01131},{"ticker":"AIM","drug":"Ampligen","status":"CRL","catalyst_date":"2009-12-01","car":-0.503,"raw_return":-0.43333,"benchmark_return":0.00276},{"ticker":"AIM","drug":"Ampligen","status":"CRL","catalyst_date":"2013-02-04","car":-0.35848,"raw_return":-0.3,"benchmark_return":0.0198},{"ticker":"AKBA","drug":"Auryxia","status":"Approved","catalyst_date":"2017-11-07","car":-0.15747,"raw_return":-0.13813,"benchmark_return":-0.01168},{"ticker":"ALKS","drug":"ALKS 5461","status":"CRL","catalyst_date":"2019-02-01","car":0.00593,"raw_return":0.03215,"benchmark_return":0.04658},{"ticker":"ALKS","drug":"Aristada","status":"Approved","catalyst_date":"2017-06-06","car":-0.00862,"raw_return":0.01276,"benchmark_return":0.02932},{"ticker":"ALKS","drug":"BYDUREON","status":"Approved","catalyst_date":"2010-01-27","car":0.01127,"raw_return":0.00644,"benchmark_return":0.00381},{"ticker":"ALKS","drug":"BYDUREON","status":"CRL","catalyst_date":"2010-03-15","car":0.04965,"raw_return":0.06131,"benchmark_return":0.01491},{"ticker":"ALKS","drug":"Diroximel fumarate (BIIB098)","status":"Approved","catalyst_date":"2019-10-30","car":-0.00579,"raw_return":0.01078,"benchmark_return":0.0284},{"ticker":"AMGN","drug":"Corlanor","status":"Approved","catalyst_date":"2015-04-15","car":-0.00077,"raw_return":0.00122,"benchmark_return":0.0061},{"ticker":"AMGN","drug":"KYPROLIS (ARROW)","status":"Approved","catalyst_date":"2018-10-01","car":0.00483,"raw_return":0.00034,"benchmark_return":-0.01269},{"ticker":"AMGN","drug":"KYPROLIS (ASPIRE)","status":"Approved","catalyst_date":"2018-06-11","car":0.00472,"raw_return":0.00071,"benchmark_return":-0.00603},{"ticker":"AMGN","drug":"KYPROLIS (ENDEAVOR)","status":"Approved","catalyst_date":"2018-01-17","car":0.04006,"raw_return":0.04023,"benchmark_return":-0.00247},{"ticker":"AMGN","drug":"OTEZLA","status":"Approved","catalyst_date":"2019-07-19","car":-0.00214,"raw_return":-0.00823,"benchmark_return":-0.00176},{"ticker":"AMGN","drug":"Parsabiv","status":"Approved","catalyst_date":"2017-02-07","car":0.0396,"raw_return":0.04944,"benchmark_return":0.0301},{"ticker":"AMPH","drug":"Primatene Mist (epinephrine inhalation aerosol)","status":"CRL","catalyst_date":"2016-12-27","car":-0.08741,"raw_return":-0.08965,"benchmark_return":-0.01323},{"ticker":"AMRN","drug":"Vascepa","status":"Approved","catalyst_date":"2012-07-26","car":-0.21205,"raw_return":-0.16106,"benchmark_return":0.02519},{"ticker":"AMRN","drug":"Vascepa","status":"Approved","catalyst_date":"2019-12-13","car":-0.0908,"raw_return":-0.08136,"benchmark_return":0.01005},{"ticker":"AQST","drug":"Exservan (riluzole) Oral Film","status":"Approved","catalyst_date":"2019-11-23","car":0.19452,"raw_return":0.25779,"benchmark_return":0.06778},{"ticker":"ARDX","drug":"Tenapanor (T3MPO-2)","status":"Approved","catalyst_date":"2019-09-12","car":-0.12492,"raw_return":-0.1032,"benchmark_return":0.05724},{"ticker":"AZN","drug":"Acalabrutinib","status":"Approved","catalyst_date":"2017-10-31","car":0.00586,"raw_return":0.0173,"benchmark_return":0.02555},{"ticker":"AZN","drug":"Calquence","status":"Approved","catalyst_date":"2019-11-21","car":-0.00497,"raw_return":0.01731,"benchmark_return":0.08068},{"ticker":"AZN","drug":"Durvalumab (PACIFIC)","status":"Approved","catalyst_date":"2018-02-19","car":0.00712,"raw_return":0.00597,"benchmark_return":-0.00524},{"ticker":"AZN","drug":"Farxiga - DECLARE","status":"Approved","catalyst_date":"2019-10-21","car":0.012,"raw_return":0.02055,"benchmark_return":0.02159},{"ticker":"AZN","drug":"Faslodex (fulvestrant)","status":"Approved","catalyst_date":"2017-08-28","car":-0.01958,"raw_return":0.00377,"benchmark_return":0.05963},{"ticker":"AZN","drug":"Lokelma (ZS-9)","status":"CRL","catalyst_date":"2016-05-26","car":0.01895,"raw_return":0.03665,"benchmark_return":0.05911},{"ticker":"AZN","drug":"Lokelma (ZS-9)","status":"CRL","catalyst_date":"2017-03-17","car":0.02407,"raw_return":0.00231,"benchmark_return":-0.04321},{"ticker":"AZN","drug":"Lokelma (ZS-9)","status":"Approved","catalyst_date":"2018-05-18","car":0.01995,"raw_return":0.02235,"benchmark_return":-0.00076},{"ticker":"AZN","drug":"Lynparza","status":"Approved","catalyst_date":"2018-01-12","car":-0.01111,"raw_return":-0.011,"benchmark_return":0.00606},{"ticker":"AZN","drug":"Lynparza (POLO)","status":"Approved","catalyst_date":"2019-12-30","car":0.00758,"raw_return":0.01043,"benchmark_return":-0.03839},{"ticker":"AZN","drug":"Lynparza - SOLO 1","status":"Approved","catalyst_date":"2018-12-19","car":-0.00432,"raw_return":-0.04189,"benchmark_return":-0.14375},{"ticker":"AZN","drug":"Lynparza - SOLO 2","status":"Approved","catalyst_date":"2017-08-17","car":-0.00787,"raw_return":-0.00481,"benchmark_return":-0.014},{"ticker":"AZN","drug":"Qternmet XR (dapagliflozin, saxagliptin and metformin hydrochloride)","status":"Approved","catalyst_date":"2019-05-03","car":0.00327,"raw_return":0.0085,"benchmark_return":-0.00505},{"ticker":"AZN","drug":"Saxagliptin and dapagliflozin","status":"Approved","catalyst_date":"2017-02-28","car":-0.00693,"raw_return":0.00305,"benchmark_return":0.05153},{"ticker":"AZN","drug":"Tagrisso","status":"Approved","catalyst_date":"2017-03-31","car":0.0093,"raw_return":-0.0016,"benchmark_return":-0.014},{"ticker":"BCRX","drug":"RAPIVAB (peramivir injection)","status":"Approved","catalyst_date":"2017-09-21","car":-0.01936,"raw_return":-0.02952,"benchmark_return":0.00262},{"ticker":"BCRX","drug":"RAPIVAB (peramivir)","status":"Approved","catalyst_date":"2014-12-22","car":0.08869,"raw_return":0.08433,"benchmark_return":-0.00063},{"ticker":"BHC","drug":"IDP-122","status":"Approved","catalyst_date":"2018-10-08","car":-0.09249,"raw_return":-0.14054,"benchmark_return":-0.09968},{"ticker":"BHC","drug":"IDP-123","status":"Approved","catalyst_date":"2019-12-19","car":-0.0248,"raw_return":-0.01352,"benchmark_return":0.01202},{"ticker":"BHC","drug":"LUMIFY (brimonidine tartrate ophthalmic solution 0.025%)","status":"Approved","catalyst_date":"2017-12-22","car":0.00477,"raw_return":0.03308,"benchmark_return":0.05297},{"ticker":"BHC","drug":"Latanoprostene bunod","status":"CRL","catalyst_date":"2017-08-07","car":-0.14325,"raw_return":-0.14312,"benchmark_return":0.00104},{"ticker":"BHC","drug":"Latanoprostene bunod","status":"Approved","catalyst_date":"2017-11-02","car":0.04175,"raw_return":0.05521,"benchmark_return":0.01214},{"ticker":"BHC","drug":"ULTRA - 7 days","status":"Approved","catalyst_date":"2018-05-02","car":0.00008,"raw_return":-0.00277,"benchmark_return":-0.01188},{"ticker":"BIIB","drug":"Diroximel fumarate (BIIB098)","status":"Approved","catalyst_date":"2019-10-30","car":0.02212,"raw_return":0.03874,"benchmark_return":0.0284},{"ticker":"BMRN","drug":"Palynziq (Pegvaliase)","status":"Approved","catalyst_date":"2018-05-24","car":0.01662,"raw_return":0.01321,"benchmark_return":0.00752},{"ticker":"BMY","drug":"Fedratinib","status":"Approved","catalyst_date":"2019-08-16","car":0.03116,"raw_return":0.02452,"benchmark_return":-0.01363},{"ticker":"BMY","drug":"IDHIFA (enasidenib) - AG-221","status":"Approved","catalyst_date":"2017-08-01","car":0.03631,"raw_return":0.02323,"benchmark_return":-0.02426},{"ticker":"BMY","drug":"REVLIMID","status":"Approved","catalyst_date":"2017-02-22","car":0.05395,"raw_return":0.03979,"benchmark_return":-0.02111},{"ticker":"BMY","drug":"REVLIMID - AUGMENT","status":"Approved","catalyst_date":"2019-05-28","car":-0.01975,"raw_return":-0.03896,"benchmark_return":-0.02238},{"ticker":"BMY","drug":"Sprycel (dasatinib)","status":"Approved","catalyst_date":"2017-11-10","car":-0.00147,"raw_return":-0.01066,"benchmark_return":-0.04849},{"ticker":"BMY","drug":"Sprycel (dasatinib)","status":"Approved","catalyst_date":"2019-01-02","car":-0.08392,"raw_return":-0.0625,"benchmark_return":0.07818},{"ticker":"CLVLY","drug":"SCENESSE","status":"Approved","catalyst_date":"2019-10-08","car":0.471,"raw_return":0.47746,"benchmark_return":-0.00796},{"ticker":"COLL","drug":"Xtampza ER (oxycodone)","status":"Approved","catalyst_date":"2017-11-07","car":0.35981,"raw_return":0.36667,"benchmark_return":-0.01168},{"ticker":"CORT","drug":"Corlux - Korlym","status":"Approved","catalyst_date":"2012-02-17","car":0.52439,"raw_return":0.47826,"benchmark_return":-0.04001},{"ticker":"CRIS","drug":"Vismodegib","status":"Approved","catalyst_date":"2012-01-30","car":-0.0826,"raw_return":-0.002,"benchmark_return":0.04518},{"ticker":"EGRX","drug":"Docetaxel Injection","status":"Approved","catalyst_date":"2015-12-24","car":-0.12699,"raw_return":-0.08186,"benchmark_return":0.022},{"ticker":"EGRX","drug":"Ryanodex","status":"CRL","catalyst_date":"2017-07-26","car":-0.34796,"raw_return":-0.32872,"benchmark_return":-0.01275},{"ticker":"ENTA","drug":"VIEKIRA PAK","status":"Approved","catalyst_date":"2014-12-19","car":0.16797,"raw_return":0.19057,"benchmark_return":0.02731},{"ticker":"EXEL","drug":"CABOMETYX (cabozantinib)","status":"Approved","catalyst_date":"2016-04-25","car":0.07898,"raw_return":0.06294,"benchmark_return":-0.01562},{"ticker":"EXEL","drug":"Cabozantinib","status":"Approved","catalyst_date":"2012-11-29","car":-0.11981,"raw_return":-0.12308,"benchmark_return":0.0},{"ticker":"EXEL","drug":"Cabozantinib (CELESTIAL)","status":"Approved","catalyst_date":"2019-01-14","car":-0.05283,"raw_return":-0.03126,"benchmark_return":0.01349},{"ticker":"EXEL","drug":"Cabozantinib - CABOSUN","status":"Approved","catalyst_date":"2017-12-19","car":0.042,"raw_return":0.07168,"benchmark_return":0.02208},{"ticker":"EXEL","drug":"Vemurafenib","status":"Approved","catalyst_date":"2015-11-10","car":-0.12303,"raw_return":-0.11726,"benchmark_return":-0.03421},{"ticker":"EYPT","drug":"Iluvien","status":"CRL","catalyst_date":"2011-11-11","car":-0.88946,"raw_return":-0.66825,"benchmark_return":-0.01793},{"ticker":"EYPT","drug":"Iluvien","status":"CRL","catalyst_date":"2013-10-18","car":-0.50275,"raw_return":-0.41242,"benchmark_return":0.02533},{"ticker":"EYPT","drug":"Iluvien","status":"Approved","catalyst_date":"2014-09-26","car":0.04772,"raw_return":0.05995,"benchmark_return":0.01109},{"ticker":"EYPT","drug":"YUTIQ","status":"Approved","catalyst_date":"2018-10-15","car":-0.12542,"raw_return":-0.07143,"benchmark_return":0.04518},{"ticker":"GILD","drug":"F\/TAF (Descovy)","status":"Approved","catalyst_date":"2019-10-03","car":-0.01436,"raw_return":-0.01026,"benchmark_return":0.00498},{"ticker":"GILD","drug":"Vosevi (Sofosbuvir\/Velpatasvir\/Voxilaprevir)","status":"Approved","catalyst_date":"2017-07-18","car":0.04124,"raw_return":0.04024,"benchmark_return":0.01212},{"ticker":"GMAB","drug":"DARZALEX (Daratumumab) +  pomalidomide and dexamethasone","status":"Approved","catalyst_date":"2017-06-16","car":-0.00898,"raw_return":0.00179,"benchmark_return":0.04198},{"ticker":"GMAB","drug":"Daratumumab + VTD","status":"Approved","catalyst_date":"2019-09-26","car":-0.00158,"raw_return":-0.01603,"benchmark_return":-0.06682},{"ticker":"GSK","drug":"Dolutegravir + lamivudine","status":"Approved","catalyst_date":"2019-04-08","car":-0.01316,"raw_return":-0.01173,"benchmark_return":0.00129},{"ticker":"GSK","drug":"Dolutegravir + rilpivirine","status":"Approved","catalyst_date":"2017-11-21","car":-0.00449,"raw_return":-0.00426,"benchmark_return":0.00651},{"ticker":"GSK","drug":"Dolutegravir + rilpivirine","status":"CRL","catalyst_date":"2019-12-21","car":-0.00576,"raw_return":0.00064,"benchmark_return":0.01752},{"ticker":"GSK","drug":"Niraparib - (QUADRA trial)","status":"Approved","catalyst_date":"2019-10-23","car":0.02346,"raw_return":0.03033,"benchmark_return":0.03433},{"ticker":"GSK","drug":"Niraparib - NOVA (Niraparib Ovarian)","status":"Approved","catalyst_date":"2017-03-27","car":0.0109,"raw_return":0.01064,"benchmark_return":0.01915},{"ticker":"GSK","drug":"Rolapitant","status":"Approved","catalyst_date":"2016-09-02","car":0.00084,"raw_return":0.01061,"benchmark_return":0.0304},{"ticker":"GSK","drug":"Rolapitant - intravenous (IV)","status":"CRL","catalyst_date":"2017-01-11","car":-0.00796,"raw_return":-0.00406,"benchmark_return":0.02605},{"ticker":"GSK","drug":"Rolapitant - intravenous (IV)","status":"CRL","catalyst_date":"2017-10-26","car":-0.09595,"raw_return":-0.09675,"benchmark_return":-0.00533},{"ticker":"GSK","drug":"Tafenoquine","status":"Approved","catalyst_date":"2018-07-23","car":-0.01095,"raw_return":-0.01098,"benchmark_return":-0.02407},{"ticker":"GSK","drug":"Trelegy Ellipta (FF\/UMEC\/VI)","status":"Approved","catalyst_date":"2017-09-18","car":-0.00068,"raw_return":0.002,"benchmark_return":0.02009},{"ticker":"GSK","drug":"Trelegy Ellipta (FF\/UMEC\/VI)","status":"Approved","catalyst_date":"2018-04-24","car":0.01605,"raw_return":0.00802,"benchmark_return":-0.01536},{"ticker":"HRTX","drug":"APF530 - Sustol","status":"CRL","catalyst_date":"2010-03-19","car":-0.17768,"raw_return":-0.27451,"benchmark_return":0.00911},{"ticker":"HRTX","drug":"APF530 - Sustol","status":"CRL","catalyst_date":"2013-03-28","car":-0.45345,"raw_return":-0.4127,"benchmark_return":0.01684},{"ticker":"HRTX","drug":"APF530 - Sustol","status":"Approved","catalyst_date":"2016-08-10","car":0.10987,"raw_return":0.07989,"benchmark_return":-0.02602},{"ticker":"HRTX","drug":"CINVANTI (HTX-019)","status":"Approved","catalyst_date":"2017-11-09","car":0.02455,"raw_return":-0.01558,"benchmark_return":-0.0394},{"ticker":"HRTX","drug":"CINVANTI (HTX-019)","status":"Approved","catalyst_date":"2019-02-26","car":-0.11223,"raw_return":-0.057,"benchmark_return":0.06005},{"ticker":"INCY","drug":"Baricitinib","status":"CRL","catalyst_date":"2017-04-14","car":-0.11203,"raw_return":-0.08474,"benchmark_return":0.01445},{"ticker":"INCY","drug":"Baricitinib","status":"Approved","catalyst_date":"2018-06-01","car":-0.00093,"raw_return":0.02013,"benchmark_return":0.05083},{"ticker":"INCY","drug":"Jakafi","status":"Approved","catalyst_date":"2011-11-16","car":0.01701,"raw_return":-0.02632,"benchmark_return":-0.03821},{"ticker":"INCY","drug":"Jakafi (ruxolitinib) (RESPONSE)","status":"Approved","catalyst_date":"2014-12-04","car":0.00586,"raw_return":0.0407,"benchmark_return":0.04385},{"ticker":"INCY","drug":"Ruxolitinib","status":"Approved","catalyst_date":"2019-05-24","car":-0.0054,"raw_return":-0.01385,"benchmark_return":-0.02402},{"ticker":"INSM","drug":"ARIKAYCE","status":"Approved","catalyst_date":"2018-09-28","car":-0.19196,"raw_return":-0.24564,"benchmark_return":-0.03818},{"ticker":"INVA","drug":"Trelegy Ellipta (FF\/UMEC\/VI)","status":"Approved","catalyst_date":"2017-09-18","car":-0.04667,"raw_return":-0.03274,"benchmark_return":0.02009},{"ticker":"INVA","drug":"Trelegy Ellipta (FF\/UMEC\/VI)","status":"Approved","catalyst_date":"2018-04-24","car":-0.11254,"raw_return":-0.10906,"benchmark_return":-0.01536},{"ticker":"IONS","drug":"SPINRAZA - Nusinersen","status":"Approved","catalyst_date":"2016-12-23","car":0.03544,"raw_return":-0.00732,"benchmark_return":-0.02592},{"ticker":"IONS","drug":"Volanesorsen - APPROACH","status":"CRL","catalyst_date":"2018-08-27","car":-0.13664,"raw_return":-0.1232,"benchmark_return":0.02947},{"ticker":"IRWD","drug":"DUZALLO (LESINURAD AND ALLOPURINOL)","status":"Approved","catalyst_date":"2017-08-21","car":0.00515,"raw_return":0.01206,"benchmark_return":0.00628},{"ticker":"JAZZ","drug":"JZP-110","status":"Approved","catalyst_date":"2019-03-20","car":0.02108,"raw_return":-0.0008,"benchmark_return":-0.03736},{"ticker":"JAZZ","drug":"JZP-6","status":"CRL","catalyst_date":"2010-10-11","car":0.04103,"raw_return":0.06105,"benchmark_return":0.02156},{"ticker":"JAZZ","drug":"Vyxeos","status":"Approved","catalyst_date":"2017-08-03","car":0.00165,"raw_return":0.01269,"benchmark_return":0.00486},{"ticker":"JAZZ","drug":"Xyrem","status":"Approved","catalyst_date":"2018-10-26","car":0.00794,"raw_return":-0.01967,"benchmark_return":-0.06066},{"ticker":"JNJ","drug":"Apalutamide","status":"Approved","catalyst_date":"2018-02-14","car":0.02386,"raw_return":0.02795,"benchmark_return":0.06263},{"ticker":"JNJ","drug":"Apalutamide","status":"Approved","catalyst_date":"2019-09-18","car":0.00666,"raw_return":0.00665,"benchmark_return":0.00356},{"ticker":"JNJ","drug":"DARZALEX (Daratumumab) +  pomalidomide and dexamethasone","status":"Approved","catalyst_date":"2017-06-16","car":0.0092,"raw_return":0.01666,"benchmark_return":0.04198},{"ticker":"JNJ","drug":"Daratumumab + VTD","status":"Approved","catalyst_date":"2019-09-26","car":-0.00945,"raw_return":-0.01791,"benchmark_return":-0.06682},{"ticker":"JNJ","drug":"Dolutegravir + rilpivirine","status":"CRL","catalyst_date":"2019-12-21","car":0.01608,"raw_return":0.01844,"benchmark_return":0.01752},{"ticker":"JNJ","drug":"Erdafitinib","status":"Approved","catalyst_date":"2019-04-12","car":0.02081,"raw_return":0.01807,"benchmark_return":-0.0269},{"ticker":"JNJ","drug":"Esketamine","status":"Approved","catalyst_date":"2019-03-05","car":0.01411,"raw_return":0.01171,"benchmark_return":-0.02894},{"ticker":"JNJ","drug":"IMBRUVICA (ibrutinib)","status":"Approved","catalyst_date":"2018-08-27","car":0.00335,"raw_return":0.00853,"benchmark_return":0.02947},{"ticker":"JNJ","drug":"INVOKANA - CREDENCE","status":"Approved","catalyst_date":"2019-09-30","car":0.016,"raw_return":0.00771,"benchmark_return":-0.05197},{"ticker":"JNJ","drug":"Imbruvica","status":"Approved","catalyst_date":"2017-08-02","car":0.00642,"raw_return":0.01009,"benchmark_return":-0.01894},{"ticker":"JNJ","drug":"XARELTO (rivaroxaban)","status":"Approved","catalyst_date":"2017-10-30","car":-0.01843,"raw_return":-0.01672,"benchmark_return":-0.00483},{"ticker":"JNJ","drug":"XARELTO (rivaroxaban)","status":"Approved","catalyst_date":"2019-10-14","car":0.03876,"raw_return":0.04605,"benchmark_return":0.05367},{"ticker":"JNJ","drug":"ZYTIGA (abiraterone acetate) - LATITUDE","status":"Approved","catalyst_date":"2018-02-08","car":-0.00248,"raw_return":-0.00092,"benchmark_return":0.00509},{"ticker":"KALA","drug":"INVELTYS","status":"Approved","catalyst_date":"2018-08-23","car":0.01861,"raw_return":0.01493,"benchmark_return":0.05037},{"ticker":"KPTI","drug":"Selinexor","status":"Approved","catalyst_date":"2019-07-03","car":0.43831,"raw_return":0.39232,"benchmark_return":-0.02223},{"ticker":"LGND","drug":"Baxdela","status":"Approved","catalyst_date":"2019-10-24","car":0.02954,"raw_return":0.04624,"benchmark_return":0.02984},{"ticker":"LGND","drug":"Brexanolone - SAGE-547 (202C)","status":"Approved","catalyst_date":"2019-03-19","car":0.10129,"raw_return":0.09281,"benchmark_return":0.01491},{"ticker":"LGND","drug":"KYPROLIS (ARROW)","status":"Approved","catalyst_date":"2018-10-01","car":-0.04483,"raw_return":-0.03686,"benchmark_return":-0.01269},{"ticker":"LGND","drug":"KYPROLIS (ASPIRE)","status":"Approved","catalyst_date":"2018-06-11","car":-0.06237,"raw_return":-0.06252,"benchmark_return":-0.00603},{"ticker":"LGND","drug":"KYPROLIS (ENDEAVOR)","status":"Approved","catalyst_date":"2018-01-17","car":0.04969,"raw_return":0.05313,"benchmark_return":-0.00247},{"ticker":"LLY","drug":"Abemaciclib - MONARCH 1 and 2","status":"Approved","catalyst_date":"2017-10-04","car":0.01664,"raw_return":0.018,"benchmark_return":0.02021},{"ticker":"LLY","drug":"Abemaciclib - MONARCH 3","status":"Approved","catalyst_date":"2018-03-26","car":0.00895,"raw_return":-0.01572,"benchmark_return":-0.06481},{"ticker":"LLY","drug":"BAQSIMI (glucagon)","status":"Approved","catalyst_date":"2019-07-24","car":0.01299,"raw_return":0.01386,"benchmark_return":0.00047},{"ticker":"LLY","drug":"Baricitinib","status":"CRL","catalyst_date":"2017-04-14","car":-0.06529,"raw_return":-0.05865,"benchmark_return":0.01445},{"ticker":"LLY","drug":"Baricitinib","status":"Approved","catalyst_date":"2018-06-01","car":0.0125,"raw_return":0.02887,"benchmark_return":0.05083},{"ticker":"LLY","drug":"Larotrectinib (LOXO-101)","status":"Approved","catalyst_date":"2018-11-26","car":-0.00718,"raw_return":0.00706,"benchmark_return":0.0586},{"ticker":"LLY","drug":"Lasmiditan","status":"Approved","catalyst_date":"2019-10-11","car":0.00939,"raw_return":0.02342,"benchmark_return":0.05077},{"ticker":"LPCN","drug":"TLANDO - LPCN 1021","status":"CRL","catalyst_date":"2016-06-29","car":-0.6597,"raw_return":-0.55814,"benchmark_return":0.07575},{"ticker":"LPCN","drug":"TLANDO - LPCN 1021","status":"CRL","catalyst_date":"2018-05-08","car":-0.24322,"raw_return":-0.29333,"benchmark_return":0.03631},{"ticker":"LPCN","drug":"TLANDO - LPCN 1021","status":"CRL","catalyst_date":"2019-11-11","car":-0.88548,"raw_return":-0.75396,"benchmark_return":0.03084},{"ticker":"LXRX","drug":"Sotagliflozin","status":"CRL","catalyst_date":"2019-03-22","car":-0.29449,"raw_return":-0.30641,"benchmark_return":-0.01666},{"ticker":"LXRX","drug":"Telotristat etiprate (XERMELO)","status":"Approved","catalyst_date":"2017-02-28","car":-0.05734,"raw_return":-0.01952,"benchmark_return":0.05153},{"ticker":"MNKD","drug":"AFREZZA","status":"CRL","catalyst_date":"2010-03-15","car":-0.33178,"raw_return":-0.28531,"benchmark_return":0.01491},{"ticker":"MNKD","drug":"AFREZZA","status":"CRL","catalyst_date":"2011-01-19","car":-0.38168,"raw_return":-0.38723,"benchmark_return":-0.03251},{"ticker":"MNKD","drug":"AFREZZA","status":"Approved","catalyst_date":"2014-06-27","car":-0.05763,"raw_return":-0.02642,"benchmark_return":0.03052},{"ticker":"MRK","drug":"Ertugliflozin","status":"Approved","catalyst_date":"2017-12-20","car":0.00368,"raw_return":0.00213,"benchmark_return":0.03385},{"ticker":"MRK","drug":"ISENTRESS","status":"Approved","catalyst_date":"2017-05-30","car":0.00705,"raw_return":0.00508,"benchmark_return":-0.00742},{"ticker":"MRK","drug":"Januvia (Sitagliptin)","status":"CRL","catalyst_date":"2017-04-07","car":-0.0131,"raw_return":-0.01712,"benchmark_return":-0.01785},{"ticker":"MRK","drug":"KEYTRUDA and Inlyta - KEYNOTE-426","status":"Approved","catalyst_date":"2019-04-22","car":-0.03588,"raw_return":-0.03649,"benchmark_return":-0.03517},{"ticker":"MRK","drug":"Keytruda and Lenvima","status":"Approved","catalyst_date":"2019-09-17","car":0.00997,"raw_return":0.01462,"benchmark_return":0.00024},{"ticker":"MRK","drug":"Letermovir","status":"Approved","catalyst_date":"2017-11-09","car":-0.00865,"raw_return":-0.01396,"benchmark_return":-0.0394},{"ticker":"MRK","drug":"Lynparza","status":"Approved","catalyst_date":"2018-01-12","car":0.09478,"raw_return":0.09208,"benchmark_return":0.00606},{"ticker":"MRK","drug":"Lynparza (POLO)","status":"Approved","catalyst_date":"2019-12-30","car":0.01264,"raw_return":0.00656,"benchmark_return":-0.03839},{"ticker":"MRK","drug":"Lynparza - SOLO 1","status":"Approved","catalyst_date":"2018-12-19","car":-0.03729,"raw_return":-0.04681,"benchmark_return":-0.14375},{"ticker":"MRK","drug":"ZERBAXA(ceftolozane and tazobactam)","status":"Approved","catalyst_date":"2019-06-03","car":0.02355,"raw_return":0.02936,"benchmark_return":0.01661},{"ticker":"NBIX","drug":"Elagolix","status":"Approved","catalyst_date":"2018-07-24","car":0.05515,"raw_return":0.04113,"benchmark_return":-0.02749},{"ticker":"NBIX","drug":"INGREZZA","status":"Approved","catalyst_date":"2017-04-11","car":0.29184,"raw_return":0.32679,"benchmark_return":0.02439},{"ticker":"NBIX","drug":"INGREZZA","status":"Approved","catalyst_date":"2017-10-05","car":0.00616,"raw_return":0.00809,"benchmark_return":-0.00273},{"ticker":"NKTR","drug":"MOVANTIK (Naloxegol)","status":"Approved","catalyst_date":"2014-09-16","car":-0.01604,"raw_return":-0.03329,"benchmark_return":-0.01715},{"ticker":"NVO","drug":"Semaglutide","status":"Approved","catalyst_date":"2017-12-05","car":-0.01045,"raw_return":-0.00483,"benchmark_return":-0.01094},{"ticker":"NVO","drug":"Semaglutide - oral - PIONEER","status":"Approved","catalyst_date":"2019-09-20","car":0.04537,"raw_return":0.03845,"benchmark_return":-0.04532},{"ticker":"NVO","drug":"Victoza (liraglutide)","status":"Approved","catalyst_date":"2017-08-25","car":-0.01167,"raw_return":0.0078,"benchmark_return":0.04432},{"ticker":"NVS","drug":"Cangrelor","status":"CRL","catalyst_date":"2014-04-30","car":0.02537,"raw_return":0.03421,"benchmark_return":0.02879},{"ticker":"NVS","drug":"Egaten","status":"Approved","catalyst_date":"2019-02-13","car":-0.00956,"raw_return":0.01159,"benchmark_return":0.04729},{"ticker":"NVS","drug":"Fingolimod","status":"Approved","catalyst_date":"2018-05-11","car":-0.0111,"raw_return":0.00402,"benchmark_return":0.0478},{"ticker":"NVS","drug":"IONSYS","status":"Approved","catalyst_date":"2015-04-30","car":0.00012,"raw_return":-0.00289,"benchmark_return":-0.02213},{"ticker":"NVS","drug":"LEE011","status":"Approved","catalyst_date":"2017-03-13","car":0.01643,"raw_return":0.01764,"benchmark_return":0.02422},{"ticker":"NVS","drug":"Lutathera","status":"CRL","catalyst_date":"2016-12-21","car":0.00669,"raw_return":0.00098,"benchmark_return":-0.00678},{"ticker":"NVS","drug":"Lutathera","status":"Approved","catalyst_date":"2018-01-26","car":0.05301,"raw_return":0.05126,"benchmark_return":-0.00824},{"ticker":"NVS","drug":"Mayzent (siponimod\/BAF312)","status":"Approved","catalyst_date":"2019-03-26","car":0.02416,"raw_return":0.02103,"benchmark_return":-0.03296},{"ticker":"NVS","drug":"Meropenem-vaborbactam","status":"Approved","catalyst_date":"2017-08-29","car":-0.0163,"raw_return":0.00849,"benchmark_return":0.06722},{"ticker":"NVS","drug":"Oritavancin","status":"Approved","catalyst_date":"2014-08-06","car":-0.02813,"raw_return":-0.01784,"benchmark_return":0.02909},{"ticker":"NVS","drug":"Promacta (eltrombopag)","status":"Approved","catalyst_date":"2018-11-16","car":-0.01481,"raw_return":-0.0154,"benchmark_return":-0.01074},{"ticker":"NVS","drug":"Rydapt (Midostaurin - PKC412)","status":"Approved","catalyst_date":"2017-04-28","car":0.02316,"raw_return":0.0223,"benchmark_return":0.00453},{"ticker":"NVS","drug":"Tafinlar (dabrafenib) and Mekinist (trametinib)","status":"Approved","catalyst_date":"2017-06-22","car":0.02783,"raw_return":0.05292,"benchmark_return":0.0801},{"ticker":"NVS","drug":"Tafinlar (dabrafenib) and Mekinist (trametinib)","status":"Approved","catalyst_date":"2018-04-30","car":-0.01105,"raw_return":-0.00824,"benchmark_return":0.01274},{"ticker":"NVS","drug":"Zykadia","status":"Approved","catalyst_date":"2017-05-26","car":0.01746,"raw_return":0.00876,"benchmark_return":-0.02785},{"ticker":"OCUL","drug":"DEXTENZA","status":"CRL","catalyst_date":"2016-07-25","car":-0.18676,"raw_return":-0.1126,"benchmark_return":0.0564},{"ticker":"OCUL","drug":"DEXTENZA","status":"CRL","catalyst_date":"2017-07-11","car":-0.31148,"raw_return":-0.29947,"benchmark_return":0.01565},{"ticker":"OCUL","drug":"DEXTENZA","status":"Approved","catalyst_date":"2018-12-03","car":0.09128,"raw_return":0.07244,"benchmark_return":-0.00284},{"ticker":"OCUL","drug":"DEXTENZA","status":"Approved","catalyst_date":"2019-06-21","car":-0.01408,"raw_return":-0.0558,"benchmark_return":-0.02932},{"ticker":"OMER","drug":"Omidria","status":"Approved","catalyst_date":"2014-06-02","car":0.02838,"raw_return":0.03636,"benchmark_return":0.00474},{"ticker":"OPK","drug":"RAYALDEE","status":"CRL","catalyst_date":"2016-03-30","car":-0.12246,"raw_return":-0.07713,"benchmark_return":0.06214},{"ticker":"OPK","drug":"RAYALDEE","status":"Approved","catalyst_date":"2016-06-21","car":0.05122,"raw_return":0.05065,"benchmark_return":-0.00536},{"ticker":"OPK","drug":"Rolapitant","status":"Approved","catalyst_date":"2016-09-02","car":0.00085,"raw_return":0.02787,"benchmark_return":0.0304},{"ticker":"PBYI","drug":"Neratinib (NERLYNX)","status":"Approved","catalyst_date":"2017-07-17","car":0.03443,"raw_return":0.07412,"benchmark_return":0.00674},{"ticker":"PCRX","drug":"EXPAREL","status":"Approved","catalyst_date":"2011-10-31","car":-0.27867,"raw_return":-0.24189,"benchmark_return":-0.01218},{"ticker":"PCRX","drug":"EXPAREL","status":"CRL","catalyst_date":"2015-03-02","car":-0.21567,"raw_return":-0.20022,"benchmark_return":0.0263},{"ticker":"PCRX","drug":"EXPAREL","status":"Approved","catalyst_date":"2018-04-06","car":0.26203,"raw_return":0.31071,"benchmark_return":0.04884},{"ticker":"PFE","drug":"BAVENCIO (avelumab) and INLYTA (axitinib)","status":"Approved","catalyst_date":"2019-05-14","car":0.02837,"raw_return":0.02461,"benchmark_return":-0.00984},{"ticker":"PFE","drug":"BOSULIF (BOSUTINIB)","status":"Approved","catalyst_date":"2017-12-19","car":-0.01144,"raw_return":-0.00603,"benchmark_return":0.02208},{"ticker":"PFE","drug":"Binimetinib - COLUMBUS","status":"Approved","catalyst_date":"2018-06-27","car":0.00814,"raw_return":-0.0063,"benchmark_return":-0.03926},{"ticker":"PFE","drug":"Dolutegravir + rilpivirine","status":"CRL","catalyst_date":"2019-12-21","car":0.01197,"raw_return":0.0126,"benchmark_return":0.01752},{"ticker":"PFE","drug":"Ertugliflozin","status":"Approved","catalyst_date":"2017-12-20","car":-0.03568,"raw_return":-0.02849,"benchmark_return":0.03385},{"ticker":"PFE","drug":"Glasdegib","status":"Approved","catalyst_date":"2018-11-21","car":-0.01396,"raw_return":-0.00391,"benchmark_return":0.00465},{"ticker":"PFE","drug":"IBRANCE (palbociclib)","status":"Approved","catalyst_date":"2017-03-31","car":0.0128,"raw_return":0.00527,"benchmark_return":-0.014},{"ticker":"PFE","drug":"IBRANCE (palbociclib)","status":"Approved","catalyst_date":"2019-04-04","car":-0.00506,"raw_return":0.007,"benchmark_return":0.0303},{"ticker":"PFE","drug":"KEYTRUDA and Inlyta - KEYNOTE-426","status":"Approved","catalyst_date":"2019-04-22","car":-0.029,"raw_return":-0.03788,"benchmark_return":-0.03517},{"ticker":"PFE","drug":"LYRICA (pregabalin)","status":"Approved","catalyst_date":"2017-10-12","car":-0.00295,"raw_return":-0.00443,"benchmark_return":-0.00923},{"ticker":"PFE","drug":"Lorlatinib","status":"Approved","catalyst_date":"2018-11-02","car":-0.01386,"raw_return":0.0028,"benchmark_return":0.06228},{"ticker":"PFE","drug":"Mylotarg (gemtuzumab ozogamicin)","status":"Approved","catalyst_date":"2017-09-01","car":0.00608,"raw_return":0.01463,"benchmark_return":0.04504},{"ticker":"PFE","drug":"Sutent (Sunitinib)","status":"Approved","catalyst_date":"2017-11-16","car":0.0004,"raw_return":0.00142,"benchmark_return":-0.00992},{"ticker":"PFE","drug":"Tafamidis","status":"Approved","catalyst_date":"2019-05-06","car":0.00124,"raw_return":0.00442,"benchmark_return":0.01016},{"ticker":"PFE","drug":"Tafamidis (tafamidis free acid form)","status":"Approved","catalyst_date":"2019-05-06","car":0.00124,"raw_return":0.00442,"benchmark_return":0.01016},{"ticker":"PFE","drug":"Talazoparib","status":"Approved","catalyst_date":"2018-10-16","car":0.01532,"raw_return":0.0278,"benchmark_return":0.03708},{"ticker":"PFE","drug":"XTANDI (ARCHES)","status":"Approved","catalyst_date":"2019-12-16","car":0.01469,"raw_return":0.01753,"benchmark_return":0.01761},{"ticker":"PFE","drug":"XTANDI (PROSPER)","status":"Approved","catalyst_date":"2018-07-13","car":0.00429,"raw_return":0.00588,"benchmark_return":0.00713},{"ticker":"PFE","drug":"Xeljanz","status":"Approved","catalyst_date":"2017-12-14","car":0.02491,"raw_return":0.02541,"benchmark_return":-0.01462},{"ticker":"PFE","drug":"Xeljanz","status":"Approved","catalyst_date":"2018-05-30","car":-0.00549,"raw_return":0.01003,"benchmark_return":0.04227},{"ticker":"PTCT","drug":"Emflaza","status":"Approved","catalyst_date":"2019-06-07","car":0.006,"raw_return":-0.01364,"benchmark_return":-0.01648},{"ticker":"PTCT","drug":"Translarna","status":"CRL","catalyst_date":"2017-10-25","car":-0.0115,"raw_return":-0.01237,"benchmark_return":-0.02126},{"ticker":"PTN","drug":"Vyleesi (Bremelanotide)","status":"Approved","catalyst_date":"2019-06-21","car":-0.16943,"raw_return":-0.16031,"benchmark_return":-0.02932},{"ticker":"RHHBY","drug":"Baloxavir marboxil","status":"Approved","catalyst_date":"2018-10-24","car":-0.03615,"raw_return":-0.04183,"benchmark_return":-0.05853},{"ticker":"RHHBY","drug":"Baloxavir marboxil","status":"Approved","catalyst_date":"2019-10-18","car":-0.00461,"raw_return":0.00138,"benchmark_return":0.02384},{"ticker":"RHHBY","drug":"Entrectinib","status":"Approved","catalyst_date":"2019-08-15","car":-0.00466,"raw_return":0.00143,"benchmark_return":0.01116},{"ticker":"RHHBY","drug":"Venclexta","status":"Approved","catalyst_date":"2018-11-21","car":-0.00326,"raw_return":0.00127,"benchmark_return":0.00465},{"ticker":"RHHBY","drug":"Venclexta (MURANO)","status":"Approved","catalyst_date":"2018-06-11","car":-0.00196,"raw_return":-0.00376,"benchmark_return":-0.00603},{"ticker":"RHHBY","drug":"Venetoclax and obinutuzumab","status":"Approved","catalyst_date":"2019-05-15","car":0.02157,"raw_return":0.02433,"benchmark_return":-0.01621},{"ticker":"RIGL","drug":"Tavalissetm (Fostamatinib)","status":"Approved","catalyst_date":"2018-04-17","car":0.0471,"raw_return":0.03836,"benchmark_return":-0.01371},{"ticker":"RMTI","drug":"Soluble Ferric Pyrophosphate","status":"Approved","catalyst_date":"2015-01-26","car":0.01848,"raw_return":0.01641,"benchmark_return":0.02475},{"ticker":"SIGA","drug":"TPOXX","status":"Approved","catalyst_date":"2018-07-13","car":0.07425,"raw_return":0.07527,"benchmark_return":0.00713},{"ticker":"SNY","drug":"Admelog (insulin lispro injection)","status":"Approved","catalyst_date":"2017-12-11","car":0.01052,"raw_return":0.01737,"benchmark_return":0.03715},{"ticker":"SRNE","drug":"ZTlido (lidocaine patch 1.8%)","status":"Approved","catalyst_date":"2018-02-28","car":-0.22095,"raw_return":-0.20879,"benchmark_return":-0.00627},{"ticker":"SUPN","drug":"Oxtellar XR","status":"Approved","catalyst_date":"2018-12-14","car":-0.01532,"raw_return":-0.05354,"benchmark_return":-0.06618},{"ticker":"TBPH","drug":"BREO ELLIPTA","status":"Approved","catalyst_date":"2015-04-30","car":-0.01263,"raw_return":-0.0464,"benchmark_return":-0.02213},{"ticker":"TBPH","drug":"Revefenacin","status":"Approved","catalyst_date":"2018-11-09","car":0.08497,"raw_return":0.03013,"benchmark_return":-0.0716},{"ticker":"TEVA","drug":"Trisenox","status":"Approved","catalyst_date":"2018-01-15","car":0.06048,"raw_return":0.03343,"benchmark_return":-0.0079},{"ticker":"TRVN","drug":"Oliceridine (TRV130)","status":"CRL","catalyst_date":"2018-11-02","car":-0.21901,"raw_return":-0.23833,"benchmark_return":0.06228},{"ticker":"TXMD","drug":"Yuvvexy - TX-004HR","status":"CRL","catalyst_date":"2017-05-08","car":-0.07374,"raw_return":-0.09382,"benchmark_return":-0.0183},{"ticker":"TXMD","drug":"Yuvvexy - TX-004HR","status":"Approved","catalyst_date":"2018-05-30","car":-0.06879,"raw_return":-0.03941,"benchmark_return":0.04227},{"ticker":"VNDA","drug":"Fanapt","status":"Approved","catalyst_date":"2016-05-26","car":0.04931,"raw_return":0.08787,"benchmark_return":0.05911},{"ticker":"VNDA","drug":"HETLIOZ (tasimelteon)","status":"Approved","catalyst_date":"2014-01-31","car":-0.04824,"raw_return":-0.0828,"benchmark_return":-0.04406},{"ticker":"VNDA","drug":"HETLIOZ (tasimelteon)","status":"CRL","catalyst_date":"2019-08-19","car":0.02492,"raw_return":0.01757,"benchmark_return":0.02474},{"ticker":"VRTX","drug":"Ivacaftor","status":"Approved","catalyst_date":"2019-04-30","car":-0.02038,"raw_return":-0.02904,"benchmark_return":-0.01936},{"ticker":"VRTX","drug":"KALYDECO","status":"Approved","catalyst_date":"2014-12-29","car":0.00835,"raw_return":0.0444,"benchmark_return":0.04063},{"ticker":"VRTX","drug":"KALYDECO (ivacaftor)","status":"Approved","catalyst_date":"2015-03-17","car":0.05193,"raw_return":0.08872,"benchmark_return":0.04971},{"ticker":"VRTX","drug":"KALYDECO (ivacaftor)","status":"CRL","catalyst_date":"2016-02-05","car":-0.07632,"raw_return":-0.11915,"benchmark_return":-0.06634},{"ticker":"VRTX","drug":"Lumacaftor and ivacaftor","status":"Approved","catalyst_date":"2015-07-02","car":0.02024,"raw_return":0.04466,"benchmark_return":0.0394},{"ticker":"VRTX","drug":"VX-445 in combination with tezacaftor and ivacaftor","status":"Approved","catalyst_date":"2019-10-21","car":0.06172,"raw_return":0.08189,"benchmark_return":0.02159},{"ticker":"VSTM","drug":"Duvelisib - DUO","status":"Approved","catalyst_date":"2018-09-24","car":-0.20701,"raw_return":-0.16535,"benchmark_return":0.00651}];
+
+const good = getComputedStyle(document.querySelector('.viz-root')).getPropertyValue('--good').trim() || '#0ca30c';
+const critical = getComputedStyle(document.querySelector('.viz-root')).getPropertyValue('--critical').trim() || '#d03b3b';
+
+function colorFor(status) { return status === 'Approved' ? '#0ca30c' : '#d03b3b'; }
+
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = 1;
+  tooltip.style.left = (evt.clientX + 14) + 'px';
+  tooltip.style.top = (evt.clientY + 14) + 'px';
+}
+function hideTip() { tooltip.style.opacity = 0; }
+
+// ---- Strip plot ----
+(function () {
+  const svg = document.getElementById('stripChart');
+  const W = 900, H = 340, marginL = 60, marginR = 20, marginT = 20, marginB = 40;
+  const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+  const cars = DATA.map(d => d.car);
+  const yMin = Math.min(...cars, -0.3), yMax = Math.max(...cars, 0.3);
+  const pad = (yMax - yMin) * 0.06;
+  const y0 = yMin - pad, y1 = yMax + pad;
+  const yScale = v => marginT + plotH - ((v - y0) / (y1 - y0)) * plotH;
+
+  const groups = { Approved: [], CRL: [] };
+  DATA.forEach(d => groups[d.status].push(d));
+
+  let svgHtml = '';
+
+  // gridlines at 0%, +-25%, +-50%
+  const ticks = [];
+  for (let t = Math.ceil(y0 / 0.25) * 0.25; t <= y1; t += 0.25) ticks.push(Math.round(t * 100) / 100);
+  ticks.forEach(t => {
+    const y = yScale(t);
+    svgHtml += `<line class="grid-line" x1="${marginL}" x2="${W - marginR}" y1="${y}" y2="${y}" />`;
+    svgHtml += `<text class="axis-label" x="${marginL - 8}" y="${y + 3}" text-anchor="end">${(t*100).toFixed(0)}%</text>`;
+  });
+  // zero baseline emphasized
+  const yZero = yScale(0);
+  svgHtml += `<line class="baseline" x1="${marginL}" x2="${W - marginR}" y1="${yZero}" y2="${yZero}" />`;
+
+  const cols = { Approved: marginL + plotW * 0.3, CRL: marginL + plotW * 0.7 };
+  const colW = plotW * 0.34;
+
+  Object.entries(groups).forEach(([status, pts]) => {
+    const cx = cols[status];
+    svgHtml += `<text class="axis-label" x="${cx}" y="${H - 14}" text-anchor="middle" font-size="12.5" font-weight="600" fill="${colorFor(status)}">${status} (n=${pts.length})</text>`;
+
+    // jitter deterministically by index
+    pts.forEach((d, i) => {
+      const jitter = ((i * 2654435761) % 1000 / 1000 - 0.5) * colW * 0.8;
+      const cx2 = cx + jitter;
+      const cy = yScale(d.car);
+      svgHtml += `<circle class="dot" cx="${cx2.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${colorFor(status)}" fill-opacity="0.55" stroke="${colorFor(status)}" stroke-opacity="0.85" stroke-width="1" data-ticker="${d.ticker}" data-drug="${d.drug.replace(/"/g,'&quot;')}" data-status="${status}" data-date="${d.catalyst_date}" data-car="${d.car}"/>`;
+    });
+
+    // median tick
+    const sorted = pts.map(d => d.car).sort((a, b) => a - b);
+    const median = sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    const my = yScale(median);
+    svgHtml += `<line class="median-tick" x1="${cx - colW / 2}" x2="${cx + colW / 2}" y1="${my}" y2="${my}" stroke="${colorFor(status)}" />`;
+  });
+
+  svg.innerHTML = svgHtml;
+
+  svg.querySelectorAll('.dot').forEach(dot => {
+    dot.addEventListener('mouseenter', (e) => {
+      const d = dot.dataset;
+      showTip(e, `<b>${d.ticker} &mdash; ${d.drug}</b>${d.status} &middot; ${d.date}<br>CAR: ${(parseFloat(d.car) * 100).toFixed(1)}%`);
+    });
+    dot.addEventListener('mousemove', (e) => showTip(e, tooltip.innerHTML));
+    dot.addEventListener('mouseleave', hideTip);
+  });
+})();
+
+// ---- Timeline scatter ----
+(function () {
+  const svg = document.getElementById('timeChart');
+  const W = 900, H = 300, marginL = 60, marginR = 20, marginT = 20, marginB = 30;
+  const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+  const dates = DATA.map(d => new Date(d.catalyst_date).getTime());
+  const xMin = Math.min(...dates), xMax = Math.max(...dates);
+  const xScale = t => marginL + ((t - xMin) / (xMax - xMin)) * plotW;
+
+  const cars = DATA.map(d => d.car);
+  const yMin = Math.min(...cars, -0.3), yMax = Math.max(...cars, 0.3);
+  const pad = (yMax - yMin) * 0.08;
+  const y0 = yMin - pad, y1 = yMax + pad;
+  const yScale = v => marginT + plotH - ((v - y0) / (y1 - y0)) * plotH;
+
+  let svgHtml = '';
+  const yTicks = [];
+  for (let t = Math.ceil(y0 / 0.25) * 0.25; t <= y1; t += 0.25) yTicks.push(Math.round(t * 100) / 100);
+  yTicks.forEach(t => {
+    const y = yScale(t);
+    svgHtml += `<line class="grid-line" x1="${marginL}" x2="${W - marginR}" y1="${y}" y2="${y}" />`;
+    svgHtml += `<text class="axis-label" x="${marginL - 8}" y="${y + 3}" text-anchor="end">${(t*100).toFixed(0)}%</text>`;
+  });
+  svgHtml += `<line class="baseline" x1="${marginL}" x2="${W - marginR}" y1="${yScale(0)}" y2="${yScale(0)}" />`;
+
+  for (let yr = 2009; yr <= 2020; yr += 2) {
+    const t = new Date(`${yr}-01-01`).getTime();
+    if (t < xMin || t > xMax) continue;
+    const x = xScale(t);
+    svgHtml += `<text class="axis-label" x="${x}" y="${H - 8}" text-anchor="middle">${yr}</text>`;
+  }
+
+  DATA.forEach(d => {
+    const cx = xScale(new Date(d.catalyst_date).getTime());
+    const cy = yScale(d.car);
+    svgHtml += `<circle class="dot" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${colorFor(d.status)}" fill-opacity="0.55" stroke="${colorFor(d.status)}" stroke-opacity="0.85" stroke-width="1" data-ticker="${d.ticker}" data-drug="${d.drug.replace(/"/g,'&quot;')}" data-status="${d.status}" data-date="${d.catalyst_date}" data-car="${d.car}"/>`;
+  });
+
+  svg.innerHTML = svgHtml;
+  svg.querySelectorAll('.dot').forEach(dot => {
+    dot.addEventListener('mouseenter', (e) => {
+      const d = dot.dataset;
+      showTip(e, `<b>${d.ticker} &mdash; ${d.drug}</b>${d.status} &middot; ${d.date}<br>CAR: ${(parseFloat(d.car) * 100).toFixed(1)}%`);
+    });
+    dot.addEventListener('mousemove', (e) => showTip(e, tooltip.innerHTML));
+    dot.addEventListener('mouseleave', hideTip);
+  });
+})();
+
+// ---- Table ----
+(function () {
+  const tbody = document.getElementById('tableBody');
+  function render(filter) {
+    const rows = DATA.filter(d => filter === 'all' || d.status === filter)
+      .slice().sort((a, b) => a.car - b.car);
+    tbody.innerHTML = rows.map(d => `
+      <tr>
+        <td>${d.ticker}</td>
+        <td>${d.drug}</td>
+        <td class="status-${d.status.toLowerCase()}">${d.status}</td>
+        <td>${d.catalyst_date}</td>
+        <td>${(d.car * 100).toFixed(1)}%</td>
+      </tr>`).join('');
+  }
+  render('all');
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render(btn.dataset.filter);
+    });
+  });
+})();
+</script>
