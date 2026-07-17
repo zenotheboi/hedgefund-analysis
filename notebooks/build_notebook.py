@@ -57,7 +57,8 @@ those 628, only 252-260 ever made it into the final priced dataset below --
 the rest were dropped by the old EDGAR-matching pipeline before ever being
 priced. §10-11 investigate whether that drop was justified.""")
 
-code("""import pandas as pd
+code("""import json
+import pandas as pd
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
@@ -635,6 +636,158 @@ md("""## 12. Known limitations / open questions
   enough to suggest a plausible, asymmetric Phase 3 effect, not enough to
   confirm it or support the board-level "average fluctuation magnitude"
   question, which needs a bootstrap CI and more verified data.
+""")
+
+# ---------------------------------------------------------------------------
+md("""## 13. Phase 3 Success: stock price, T-1yr..T+1yr around announcement
+
+A different cut than the CAR analysis above: instead of the tight T-2..T+2
+event-window return, this pulls the full daily price series for every
+`Phase 3` / `category_clean == 'Success'` trial, indexed to 100 at the
+announcement date, spanning a full year on each side. Useful for seeing the
+shape of the run-up/reaction around a Phase 3 success (e.g. whether gains
+are concentrated at the announcement or drift in beforehand), which the
+short CAR window by design can't show.""")
+
+code("""p3_success = clean[(clean['phase_clean'] == 'Phase 3') &
+                    (clean['category_clean'] == 'Success')][['nct_id', 'ticker']].copy()
+
+with open('../data/processed/full_pool_event_windows_all260.json') as f:
+    event_windows = json.load(f)
+
+p3_success['event_date'] = p3_success['nct_id'].map(
+    lambda n: next(r['date'] for r in event_windows[n] if r['trading_day_offset'] == 0)
+)
+p3_success = p3_success.reset_index(drop=True)
+print(f"Phase 3 Success trials: {len(p3_success)}")
+p3_success
+""")
+
+code("""import yfinance as yf
+
+records = []
+for _, row in p3_success.iterrows():
+    event_date = pd.Timestamp(row['event_date'])
+    start, end = event_date - pd.Timedelta(days=370), event_date + pd.Timedelta(days=370)
+    px = yf.download(row['ticker'], start=start, end=end, auto_adjust=True, progress=False)['Close']
+    if isinstance(px, pd.DataFrame):
+        px = px.iloc[:, 0]
+    if px.empty:
+        print(f"no price data for {row['ticker']} ({row['nct_id']})")
+        continue
+    px.index = pd.to_datetime(px.index)
+    anchor_pos = px.index.searchsorted(event_date)
+    if anchor_pos >= len(px):
+        continue
+    indexed = px / px.iloc[anchor_pos] * 100
+    days_from_event = (px.index - px.index[anchor_pos]).days
+    records.extend({"nct_id": row['nct_id'], "ticker": row['ticker'],
+                     "days_from_event": d, "indexed_price": v}
+                    for d, v in zip(days_from_event, indexed))
+
+p3_success_prices = pd.DataFrame(records)
+print(f"{p3_success_prices['nct_id'].nunique()} of {len(p3_success)} trials priced, "
+      f"{len(p3_success_prices)} daily price points")
+""")
+
+code("""fig, ax = plt.subplots(figsize=(11, 6))
+
+for nct_id, g in p3_success_prices.groupby('nct_id'):
+    g = g.sort_values('days_from_event')
+    ax.plot(g['days_from_event'], g['indexed_price'], color='steelblue', alpha=0.25, linewidth=1)
+
+counts = p3_success_prices.groupby('days_from_event')['indexed_price'].count()
+avg = p3_success_prices.groupby('days_from_event')['indexed_price'].mean()
+avg = avg[counts >= max(5, p3_success_prices['nct_id'].nunique() * 0.3)]
+ax.plot(avg.index, avg.values, color='crimson', linewidth=2.5, label='Mean across trials')
+
+ax.axvline(0, color='black', linestyle='--', linewidth=1, label='Announcement (T0)')
+ax.axhline(100, color='gray', linestyle=':', linewidth=0.8)
+ax.set_xlabel('Calendar days from announcement')
+ax.set_ylabel('Indexed price (T0 = 100)')
+ax.set_title(f"Phase 3 Success: stock price, T-1yr..T+1yr ({p3_success_prices['nct_id'].nunique()} trials)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+""")
+
+# ---------------------------------------------------------------------------
+md("""## 14. Single-trial examples: non-big-pharma Phase 3 Successes
+
+The aggregate plot above is dominated by large-cap names (Novo Nordisk,
+AstraZeneca, AbbVie, Pfizer, ...) where a single Phase 3 readout is a small
+fraction of overall firm value, so small-cap, single-asset biotechs are a
+cleaner illustration of what a Phase 3 Success announcement actually looks
+like in the price. 10 non-big-pharma trials are plotted individually below,
+each on its own axes with actual close price (not indexed) and the
+announcement date marked.""")
+
+code("""BIG_PHARMA_TICKERS = {'NVO', 'AZN', 'ABBV', 'PFE', 'AMGN', 'BMY', 'VRTX', 'GILD', 'JNJ', 'MRK', 'LLY', 'NVS', 'SNY', 'BIIB'}
+non_big_pharma = p3_success[~p3_success['ticker'].isin(BIG_PHARMA_TICKERS)]
+print(f"{len(non_big_pharma)} of {len(p3_success)} Phase 3 Success trials are NOT big pharma")
+non_big_pharma[['nct_id', 'ticker', 'event_date']]
+""")
+
+code("""examples = non_big_pharma.head(10)
+
+fig, axes = plt.subplots(5, 2, figsize=(13, 16))
+for ax, (_, row) in zip(axes.flat, examples.iterrows()):
+    event_date = pd.Timestamp(row['event_date'])
+    start, end = event_date - pd.Timedelta(days=370), event_date + pd.Timedelta(days=370)
+
+    px = yf.download(row['ticker'], start=start, end=end, auto_adjust=True, progress=False)['Close']
+    if isinstance(px, pd.DataFrame):
+        px = px.iloc[:, 0]
+    px.index = pd.to_datetime(px.index)
+
+    ax.plot(px.index, px.values, color='steelblue', linewidth=1.2)
+    ax.axvline(event_date, color='black', linestyle='--', linewidth=1)
+    ax.set_title(f\"{row['ticker']} ({row['nct_id']})\", fontsize=10)
+    ax.set_ylabel('Close ($)')
+    ax.tick_params(axis='x', labelrotation=30)
+
+fig.suptitle('Phase 3 Success, non-big-pharma: stock price T-1yr..T+1yr (dashed = announcement)', y=1.01)
+plt.tight_layout()
+plt.show()
+""")
+
+# ---------------------------------------------------------------------------
+md("""### 14a. Same 10 trials, normalized so they're directly comparable
+
+Raw dollar prices above aren't comparable across tickers (MDGL trades in the
+hundreds, TNXP in cents). Indexing each to 100 at its own announcement date
+puts all 10 on the same scale and overlays them on one chart, same approach
+as the aggregate plot in §13.""")
+
+code("""fig, ax = plt.subplots(figsize=(11, 6))
+colors = plt.cm.tab10.colors
+
+for i, (_, row) in enumerate(examples.iterrows()):
+    event_date = pd.Timestamp(row['event_date'])
+    start, end = event_date - pd.Timedelta(days=370), event_date + pd.Timedelta(days=370)
+
+    px = yf.download(row['ticker'], start=start, end=end, auto_adjust=True, progress=False)['Close']
+    if isinstance(px, pd.DataFrame):
+        px = px.iloc[:, 0]
+    px.index = pd.to_datetime(px.index)
+
+    anchor_pos = px.index.searchsorted(event_date)
+    if anchor_pos >= len(px):
+        continue
+    indexed = px / px.iloc[anchor_pos] * 100
+    days_from_event = (px.index - px.index[anchor_pos]).days
+
+    ax.plot(days_from_event, indexed.values, color=colors[i % len(colors)], linewidth=1.4,
+            label=f\"{row['ticker']} ({row['nct_id']})\")
+
+ax.axvline(0, color='black', linestyle='--', linewidth=1)
+ax.axhline(100, color='gray', linestyle=':', linewidth=0.8)
+ax.set_xlabel('Calendar days from announcement')
+ax.set_ylabel('Indexed price (T0 = 100)')
+ax.set_title('Phase 3 Success, non-big-pharma: normalized price, T-1yr..T+1yr')
+ax.legend(fontsize=8, ncol=2)
+plt.tight_layout()
+plt.show()
 """)
 
 nb["cells"] = cells
