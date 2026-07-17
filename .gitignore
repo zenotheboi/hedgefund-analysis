@@ -6,3 +6,6 @@ data/raw/
 data/interim/
 .env
 .DS_Store
+
+# throwaway base64 intermediates (embedded directly in the HTML report)
+reports/*_b64.txt

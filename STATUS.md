@@ -1,11 +1,147 @@
 # Project Status & Handoff Notes
 
-Last updated: 2026-07-14. Read this first in any new session before
+Last updated: 2026-07-15. Read this first in any new session before
 touching code. This replaces the previous version of this file, which had
 grown into a round-by-round log of a single very long audit session —
 that detail still exists in the session transcript and the `data/interim/`
 working files if you need it, but this file states where things landed,
 not how they got there.
+
+## 2026-07-15 pivot: BioPharmCatalyst data source (active track)
+
+The CTOD/EDGAR pipeline below (everything from "Where things stand right
+now" on) was the Day-1 prototype. On 2026-07-15 the user asked to switch to
+a second, independent data source to sidestep the EDGAR-matching problem
+entirely: **BioPharmCatalyst**, scraped by a third party
+(`github.com/Tejas1415/Web-Scrape-Stock-Ticker-and-Company-Name-Datasets`,
+`BioPharmCatalyst.csv`). This is a *new, parallel* analysis, not a
+replacement of the CTOD work yet — both should be kept.
+
+**Why this source is actually a fix, not just a different dataset**: its
+`Catalyst Date` is an analyst-curated market-disclosure date, so it removes
+the EDGAR trial-to-filing matching problem (the CTOD pipeline's core open
+issue, 172 trials still unverified) at the source — no filing search or
+scoring needed.
+
+**Coverage caveat, important**: the file only covers **2009-07-05 to
+2020-01-14** — NOT the trailing 10 years the user originally asked for. It's
+a static scrape, stale by ~6 years. Flag this any time these numbers are
+used or presented.
+
+**Pipeline built this session** (`scripts/25`-`28_biopharmcatalyst_*.py`,
+reuses `src/hedgefund/pubchem.py` and `src/hedgefund/prices.py` unchanged):
+1. `25_biopharmcatalyst_clean.py` — strip whitespace, drop 61 rows where the
+   status column contained leaked SVG markup (scraper bug) and 17 exact
+   duplicates. 2258 → 2180 rows.
+2. `26_biopharmcatalyst_filter_and_pubchem.py` +
+   `26b_biopharmcatalyst_pubchem_retry.py` — filter to `Approved`/`CRL` only
+   (per user's request, ignoring all other stage values for this first
+   pass), then PubChem-verify small-molecule/peptide status (MW ≤ 8000 Da,
+   same rule as CTOD). Raw literal drug-name lookup only found 85/462
+   unique names; a name-cleaning retry (strip parentheticals, dosage-form
+   words, trial-name suffixes, split combo drugs into components) recovered
+   182 more → 267/462 (58%) unique small-molecule/peptide names, 363 rows.
+3. `27_biopharmcatalyst_merge_pubchem.py` — merges original + retry PubChem
+   results into the final filtered set.
+4. `28_biopharmcatalyst_pull_prices.py` — prices each event with the same
+   estimator as CTOD (`fit_market_model` + `short_window_car`, T-2..T+2 vs
+   XBI), but pulls each ticker's full 2008-2020 history once and slices
+   per-event windows in memory instead of re-downloading per event (363
+   events, 130 tickers). **249/363 (68.6%) priced successfully**; the other
+   114 fail because 109 tickers have zero Yahoo Finance history at all
+   (delisted/acquired biotechs Yahoo has purged — e.g. ARNA, CLVS, SGEN,
+   MYL, AGN, real M&A exits, not a bug) and 5 lack enough pre-event history.
+
+**Result: Approved vs. CRL, n=249, all phases combined** — median CAR
+Approved +0.4% (n=209) vs. CRL -11.7% (n=40), Mann-Whitney p=5.4e-8, Welch
+t-test p=6.6e-6. Same asymmetry as the CTOD Phase-3 finding (approval is
+priced-in/unsurprising, rejection is the real shock) but on a much larger,
+directly-sourced sample with no EDGAR dependency.
+
+**Published artifact**: HTML page with CAR strip plot, CAR-vs-time scatter,
+filterable 249-row table, and the phase-separation proposal below — ask the
+user for the current link if continuing this thread (redeploys to the same
+URL via the same file path in `/private/tmp/.../scratchpad/biopharm_car_analysis.html`
+if resuming in the same session; otherwise regenerate from
+`data/processed/biopharmcatalyst_small_molecule_car.csv`).
+
+**Open problem, same shape as CTOD's EDGAR gap: phase separation.** The raw
+file's `Approved or CRL` column is really a 13-value catalyst-type field
+(Phase 1 through Phase 3, NDA/BLA Filing, PDUFA, Approved, CRL all mixed
+together) — there's no explicit "which phase was this approval decision
+based on" link. Approved/CRL rows are already a reasonable proxy for
+"Phase 3 pivotal outcome" (FDA approvals are made almost entirely on Phase
+3 data), which is why this first pass treats them that way. **Recommended
+next step**: link each Approved/CRL row back to the most recent prior
+same-ticker/same-drug Phase 1/2/3 row in this same CSV (reusing the
+name-cleaning logic from step 2) to get an explicit phase per event, with
+openFDA/Drugs@FDA as a spot-check on drug identity (not phase — it doesn't
+carry trial phase) and ClinicalTrials.gov as a fallback for unlinked rows.
+Beyond that, the 1,547 Phase 1/1b/2/2a/2b/2-3/3 rows have no
+success/failure label at all — only free-text `Catalyst Description` — a
+keyword classifier on that text (same idea as the EDGAR filing scorer in
+the CTOD pipeline) would be needed to price those as events too.
+
+**Live-scrape attempt, 2026-07-15 — blocked, don't retry without a paid login.**
+User asked to adapt the original repo's scraper (`BiopharmCatalyst_Download.py`,
+which works by manually pasting view-source HTML into a text file) to hit
+the live site directly with a date range and real phase data. Investigated
+via browser network inspection: the site migrated to a Vue SPA since 2020 —
+the static page no longer contains table rows at all (only a ticker
+autocomplete list), and the real data now loads from
+`GET /api/historical-catalysts-calendar?page=N`. That endpoint returns
+HTTP 200 to anonymous requests but with **placeholder content** on every
+row (`drug_name: "PLCB"`, `indication: "Placebo"`, `note: "Lorem ipsum..."`)
+— real ticker/price/sparkline, fake everything else. This is a paywall,
+not a bug; did not attempt to log in or bypass it. **One genuinely useful
+thing did come out of this**: `GET /api/stages` is public (just taxonomy
+metadata, not gated event data) and returns BioPharmCatalyst's own official
+phase hierarchy with a `simplified_stage` field (phase0=Preclinical/IND-
+Enabling, phase1=Phase1a/1/1b/1-2, phase2=Phase2a/2/2b, phase3=Phase2-3/3,
+phase4=NDA/sNDA/BLA Filing, phase5=PDUFA, phase6=Approved/CRL) — confirms
+the phase-separation proposal above is right that Approved/CRL sit one
+step past Phase 3 as the terminal regulatory-decision bucket, from an
+authoritative source rather than inference.
+
+**Cross-check against free/official sources instead (2026-07-15), in place
+of live BioPharmCatalyst access** — `scripts/29_crosscheck_openfda_approvals.py`,
+`scripts/30_crosscheck_edgar_crls.py`:
+- **Approved events**: openFDA Drugs@FDA (free, public, no login) — for each
+  of 286 Approved rows, searched by cleaned drug name and compared the
+  closest FDA "AP" (approved) submission date to BioPharmCatalyst's Catalyst
+  Date. **215/286 (75%) confirmed within 45 days.** 18 large-delta mismatches
+  (years off) are consistent with generic-name search ambiguity (multiple
+  manufacturers sharing an ingredient name) rather than BPC date errors —
+  worth tightening the query (restrict to `submission_type=ORIG`, or search
+  by NDA/BLA application number when known) if this needs to be load-bearing
+  later. 53 not found in openFDA at all (mostly combo-drug/company-code
+  names, same pattern as the PubChem matching gaps).
+- **CRL events**: SEC EDGAR full-text search (reuses `src/hedgefund/sec.py`,
+  the CTOD/EDGAR track's own module) for 8-K/6-K filings mentioning
+  "Complete Response Letter" within +-30 days of the Catalyst Date, keyed by
+  ticker->CIK from `data/raw/sec/company_tickers.json`. **26/40 tickers with
+  a matched CIK confirmed (65%)**; the other 37 of 77 CRL rows have no CIK
+  match at all because that ticker JSON only lists *currently* SEC-registered
+  companies — the same delisted/acquired-ticker gap seen in the yfinance
+  pricing step (ARNA, CLVS, SGEN, SPPI, etc.). Fixable with an EDGAR
+  company-name search fallback if pursued further; not done this session.
+- **Net takeaway**: BioPharmCatalyst's Approved/CRL dates hold up well
+  against independent, free, official sources on the events that could be
+  matched — this is real support for trusting the static CSV's core numbers,
+  not just an assumption. Output files: `data/interim/29_openfda_crosscheck.csv`,
+  `data/interim/30_edgar_crl_crosscheck.csv`.
+
+**Key files**: `data/raw/biopharmcatalyst/BioPharmCatalyst.csv` (source),
+`data/interim/25_biopharmcatalyst_clean.csv`,
+`data/interim/27_biopharmcatalyst_approved_crl_small_molecule.csv`,
+`data/processed/biopharmcatalyst_small_molecule_car.csv` (final priced
+dataset, 249 rows), `data/processed/biopharmcatalyst_event_windows.json`
+(full per-day price/return series per event), `data/interim/28_pricing_errors.csv`
+(the 114 unpriced events + why).
+
+---
+
+## CTOD/EDGAR pipeline (prior track, still valid, see above for what's new)
 
 ## What this project is
 
@@ -241,4 +377,26 @@ worth doing before trusting those pools for anything either.
 - `src/hedgefund/` — reusable modules (sec.py, ctgov.py, pubchem.py,
   outcome_category.py, edgar_dates.py, prices.py, news_fallback.py).
 - Chart: published artifact (ask the user for the link) — stale, not
-  updated with today's work.
+  updated with today's work. Separate from the manager one-pager below.
+- Manager one-pager: a second, separate published Artifact (custom
+  Fraunces/IBM Plex type system, diverging blue/amber CAR chart) that
+  summarizes the Phase 3 finding for non-technical presentation. Not the
+  same thing as the chart artifact above — ask the user for the link if
+  continuing this thread.
+
+## Git / GitHub state (new as of 2026-07-14 — this project was never
+## committed before this session)
+
+`/Users/gigi/hedgefund-analysis` is a fork (`zenotheboi/hedgefund-analysis`)
+of the original author's repo (`SteliosKyriacou/hedgefund-analysis`). First
+commit (`3030f5a`, 42 files) pushed this session — `.gitignore` already
+correctly excludes `venv/`, `data/raw/`, `data/interim/`, so only
+`data/processed/` and code are tracked; the many `data/interim/*` working
+files referenced throughout this doc exist locally but are NOT in git.
+Workflow: PR within the fork (`gigi`→`main`) merged by the user, then a PR
+opened directly to the upstream author
+(`SteliosKyriacou/hedgefund-analysis` PR #1, `zenotheboi:main`→`main`),
+titled/framed as "Prototype 1" since the user plans to change the
+underlying dataset next iteration — carry that same "this will change"
+caveat into any future upstream-facing communication, don't present
+current numbers as final there.
