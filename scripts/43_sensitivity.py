@@ -135,20 +135,33 @@ sweep_results["model accuracy (70-100 %)"] = {"vals": acc_vals, "finals_Musd": a
 print(f"{'model accuracy':22} {[round(f) for f in acc_finals]}")
 
 # ---- tornado: range of final across each single-variable sweep ----
+# Compute all, then present only the TOP 5 individually and fold the rest into a
+# single "others (immaterial)" bar -- standard OAT reporting: rank all, show the
+# ones that move the result, collapse the tail.
 tornado = sorted(((lbl, max(d["finals_Musd"]) - min(d["finals_Musd"]),
                    min(d["finals_Musd"]), max(d["finals_Musd"]))
                   for lbl, d in sweep_results.items()), key=lambda x: x[1])
+TOP = 5
+b = base_final / 1e6
+tail = tornado[:-TOP]                      # the smaller-range variables
+top = tornado[-TOP:]                       # most important, ascending
+if tail:
+    tail_lo = min(t[2] for t in tail); tail_hi = max(t[3] for t in tail)
+    plotted = [(f"{len(tail)} others (each <${top[0][1]:.1f}M range)",
+                tail_hi - tail_lo, tail_lo, tail_hi)] + top
+else:
+    plotted = top
 
 fig, ax = plt.subplots(figsize=(9, 5))
-labels = [t[0] for t in tornado]
-lows = [t[2] for t in tornado]; highs = [t[3] for t in tornado]
-b = base_final / 1e6
-for i, (lbl, rng_, lo, hi) in enumerate(tornado):
-    ax.barh(i, hi - lo, left=lo, height=0.6, color="#2a78d6", alpha=0.75)
+labels = [t[0] for t in plotted]
+for i, (lbl, rng_, lo, hi) in enumerate(plotted):
+    is_fold = lbl.endswith("range)")
+    ax.barh(i, hi - lo, left=lo, height=0.6,
+            color="#b8bdc4" if is_fold else "#2a78d6", alpha=0.6 if is_fold else 0.8)
 ax.axvline(b, color="#d03b3b", lw=1.5, label=f"realistic base ${b:.0f}M")
 ax.set_yticks(range(len(labels))); ax.set_yticklabels(labels)
-ax.set_xlabel("Ending equity in USD millions (from a 10M start).  Each bar = the range as that one variable is swept across the shown span.")
-ax.set_title("Sensitivity tornado - realistic backtest (longer bar = result depends on it more)")
+ax.set_xlabel("Ending equity in USD millions (from a 10M start).  Each bar = the range as that one variable is swept across the shown span.  Grey = folded tail (immaterial).")
+ax.set_title("Sensitivity tornado - realistic backtest (top 5 drivers; rest folded)")
 ax.legend()
 plt.tight_layout(); fig.savefig("reports/backtest_tornado.png", dpi=95, bbox_inches="tight"); plt.close(fig)
 

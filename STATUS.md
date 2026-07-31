@@ -52,9 +52,11 @@ report's backtest section; this is the handoff summary.
 - `scripts/43_sensitivity.py` — one-at-a-time tornado (every param, with
   units in labels), bear/base/bull scenarios, regime. Also 2016-2019. Output
   `backtest_sensitivity.json` + tornado.png.
-- `scripts/44_monte_carlo.py` — (1) bootstrap over trades (trade luck), (2)
-  MC over assumptions for two accuracy bands (82-100% and 70-100%). Output
-  `backtest_montecarlo.json` + montecarlo.png.
+- `scripts/44_monte_carlo.py` — same-baseline decomposition at 90% & 80%
+  accuracy: (A) bootstrap over trades (pooled over 8 books) = trade luck,
+  (B1) independent + (B2) Gaussian-copula MC over the 5 cost assumptions =
+  assumption luck, plus a supplementary full-risk MC (accuracy also random).
+  Output `backtest_montecarlo.json` + montecarlo.png (2-panel).
 
 ### Decisive finding — signal is SMALL-CAP ONLY
 By market-cap tier, failures: small-cap CRL -18%, P2miss -11%, P3miss -15%
@@ -93,23 +95,37 @@ Successes: small-cap Phase 2/3 met +3% event/+5-6% hold; approvals weaker
    the biggest-drop (hardest-to-borrow) shorts, not a random 40%. Cut short
    P&L $6.2M->$1.3M.
 
-### Monte Carlo (backtest_montecarlo.json)
-- **Bootstrap (trade luck)**: median $27.0M, 90% CI [$20.8M, $34.1M],
-  P(loss)=0%. NOTE baseline: holds assumptions at base INCLUDING 100%
-  accuracy — that's why its median ~= point estimate and looks "best".
-- **MC assumptions, 82-100% model** (avg ~91%): median $24.6M, CI
-  [$16.6M, $32.0M], P(loss) ~0%.
-- **MC assumptions, 70-100% model** (avg ~85%): median $21.6M, CI
-  [$11.4M, $31.0M], P(loss) 3%.
-- Read: trade luck barely moves it; the downside is ALL model accuracy. The
-  MC medians already bake in an imperfect model (preview of Steps 3-4). The
-  MC 5th-pct ($16.6M) ~= the hand-picked bear case ($16.5M), confirming bear
-  is a real ~1-in-20 outcome.
-- **OPEN / user-requested**: the three MC tests DON'T share a baseline
-  (bootstrap at 100% acc, MC at 91%/85%) so trade-luck-vs-assumption-luck
-  isn't apples-to-apples. User asked whether to re-run bootstrap AND MC both
-  at a common accuracy (e.g. 90%) to make them directly comparable. NOT yet
-  done — do this if picked up.
+### Monte Carlo (backtest_montecarlo.json) — REBUILT 2026-07-30 (same-baseline + copula)
+Model accuracy (the dominant driver) is now HELD FIXED at a common baseline
+(90% and 80%) across all tests, so trade-luck vs assumption-luck is
+apples-to-apples. Accuracy itself is analysed separately via the script-43
+sweep (not blended in). Assumptions drawn both independently AND correlated
+(Gaussian single-factor copula: a liquidity-stress factor makes borrow
+pricier / utilization lower / shorting harder / impact higher together).
+Bootstrap now pools per-trade P&L over 8 degraded books so it isolates PURE
+trade-selection luck (not one lucky/unlucky mislabel draw).
+
+At **90% accuracy** (all three cluster — result is robust to both luck types):
+- A. Trade luck (bootstrap): median $23.2M, CI [$16.8M, $30.3M], P(loss) 0%
+- B1. Assumptions independent: $23.6M, [$17.7M, $30.2M], 0%
+- B2. Assumptions correlated: $23.7M, [$17.9M, $29.5M], 0%
+At **80% accuracy**:
+- A. Trade luck: $18.7M, [$12.1M, $25.9M], 1.5%
+- B1. independent: $18.8M, [$12.3M, $26.0M], 1.0%
+- B2. correlated: $18.9M, [$12.4M, $25.0M], 1.5%
+Supplementary **full-risk** (accuracy also random 70-100% + correlated):
+median $21.4M, CI [$11.3M, $29.4M], P(loss) 3.7%.
+
+Read: (1) at a fixed accuracy, trade luck ≈ assumption luck (both ~$23M @90%,
+~$19M @80%, near-identical spreads) → not a few lucky deals nor lucky cost
+guesses. (2) Correlation matters MILDLY — copula trims the upside (90% CI top
+$29.5M vs $30.2M indep) and lifts P(loss) a touch (80%: 1.5% vs 1.0%); the
+downside does NOT blow out. (3) The lever that dominates is model accuracy,
+which is exactly why it gets its own axis (the sweep).
+- **RESOLVED** (was the open common-baseline item): all tests now at a shared
+  90%/80% accuracy. Correlation/copula implemented (not deferred).
+- Tornado (script 43) now plots the TOP 5 drivers individually and folds the
+  remaining 4 into one grey "others (immaterial)" bar.
 
 ### Assumptions & confidence (what a manager will interrogate)
 - Grounded in our data: entry/exit timing (long T-20/T+63, short T-10/T+5).
