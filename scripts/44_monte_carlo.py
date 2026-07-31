@@ -164,14 +164,16 @@ fig, axes = plt.subplots(len(BASELINES), 1, figsize=(11, 8), sharex=True)
 bins = np.linspace(5, 45, 45)
 for ax, acc in zip(axes, BASELINES):
     d = runs[f"acc_{int(acc*100)}"]
-    ax.hist(d["bootstrap"], bins=bins, color="#3a7d44", alpha=0.55, label="A. trade luck (bootstrap)")
-    ax.hist(d["mc_indep"], bins=bins, color="#9aa0a6", alpha=0.4, label="B1. assumptions independent")
-    ax.hist(d["mc_corr"], bins=bins, color="#d0803b", alpha=0.55, label="B2. assumptions correlated (hedged)")
-    ax.hist(d["mc_corr_unhedged"], bins=bins, histtype="step", color="#7048e8", lw=1.8, label="B2 correlated, UN-hedged")
+    # density=True so all four are comparable despite different sample counts
+    # (bootstrap N=10000 vs MC N=500) -- otherwise the bootstrap dwarfs the rest.
+    ax.hist(d["bootstrap"], bins=bins, density=True, color="#3a7d44", alpha=0.35, label=f"A. trade luck (bootstrap, N={N_BOOT})")
+    ax.hist(d["mc_indep"], bins=bins, density=True, histtype="step", color="#9aa0a6", lw=1.6, label=f"B1. assumptions independent (N={N_MC})")
+    ax.hist(d["mc_corr"], bins=bins, density=True, color="#d0803b", alpha=0.5, label=f"B2. assumptions correlated (hedged, N={N_MC})")
+    ax.hist(d["mc_corr_unhedged"], bins=bins, density=True, histtype="step", color="#7048e8", lw=1.8, label=f"B2 correlated, UN-hedged (N={N_MC})")
     for arr, col in [(d["bootstrap"], "#3a7d44"), (d["mc_corr"], "#d0803b")]:
         ax.axvline(np.median(arr), color=col, lw=2); ax.axvline(np.percentile(arr, 5), color=col, lw=1, ls="--")
     ax.axvline(CAP, color="#c0392f", lw=1.4, label="break-even ($10M)")
-    ax.set_ylabel("Frequency"); ax.set_title(f"Baseline model accuracy fixed at {int(acc*100)}% (long+lend)", fontsize=10)
+    ax.set_ylabel("Probability density"); ax.set_title(f"Baseline model accuracy fixed at {int(acc*100)}% (long+lend)", fontsize=10)
     if acc == BASELINES[0]:
         ax.legend(fontsize=8, loc="upper right")
 axes[-1].set_xlabel("Final equity ($M, 10M start). Solid=median, dashed=5th pct. Purple step = un-hedged (hedge comparison).")
