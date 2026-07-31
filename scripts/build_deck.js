@@ -193,11 +193,11 @@ s.addNotes("The lending fee is a daily flow, not an upfront payment, and it coll
 
 // ---------------------------------------------------------------- Slide 7: RESULTS
 s = p.addSlide(); s.background = { color: PAPER };
-head(s, "5", "Results — deployed long+lend vs the market", "2016–2019, small-cap, capped pre-COVID · perfect-foresight; realistic 90% model ~$26M");
-statCard(s, 0.6, 1.5, 3.0, "$28.9M", "$10M grows to", MINT);
-statCard(s, 3.65, 1.5, 3.0, "29%", "CAGR", NAVY);
-statCard(s, 6.7, 1.5, 3.0, "1.65", "Sharpe", NAVY);
-statCard(s, 9.75, 1.5, 3.0, "−16%", "max drawdown", RED);
+head(s, "5", "Results — deployed long+lend vs the market", "2016–2019, small-cap, capped pre-COVID · headline = realistic 90% model; perfect-foresight ceiling $28.9M");
+statCard(s, 0.6, 1.5, 3.0, "$26.3M", "$10M grows to (90% model)", MINT);
+statCard(s, 3.65, 1.5, 3.0, "27%", "CAGR", NAVY);
+statCard(s, 6.7, 1.5, 3.0, "1.47", "Sharpe", NAVY);
+statCard(s, 9.75, 1.5, 3.0, "−18%", "max drawdown", RED);
 // benchmark table
 const td = (t, o = {}) => ({ text: t, options: { fontFace: BF, fontSize: 12, color: "27313F", valign: "middle", align: o.align || "center", ...o } });
 const rows = [
