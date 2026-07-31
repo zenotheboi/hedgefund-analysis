@@ -203,7 +203,7 @@ const td = (t, o = {}) => ({ text: t, options: { fontFace: BF, fontSize: 12, col
 const rows = [
   [td("$10M →", { align: "left", bold: true, color: WHITE }), td("Total", { bold: true, color: WHITE }), td("CAGR", { bold: true, color: WHITE }), td("Sharpe", { bold: true, color: WHITE }), td("Max DD", { bold: true, color: WHITE })].map(c => ({ ...c, options: { ...c.options, fill: NAVY } })),
   [td("Strategy (perfect foresight)", { align: "left", bold: true, color: NAVY }), td("$28.9M", { bold: true, color: MINT }), td("29%", { bold: true }), td("1.65", { bold: true }), td("−16%", { bold: true })],
-  [td("Strategy @ 90% model (fair)", { align: "left" }), td("$26.1M"), td("~27%"), td("—"), td("—")],
+  [td("Strategy @ 90% model (fair)", { align: "left" }), td("$26.3M"), td("~27%"), td("1.47"), td("−18%")],
   [td("S&P 500 buy-and-hold", { align: "left" }), td("$16.7M"), td("13%"), td("1.11"), td("−20%")],
   [td("XBI (biotech) buy-and-hold", { align: "left" }), td("$15.1M"), td("10%"), td("0.42"), td("−36%")],
 ];
@@ -291,7 +291,7 @@ s.addTable(crows, { x: 0.6, y: 1.7, w: 12.1, colW: [4.6, 4.0, 3.5], rowH: 0.55,
 s.addShape(p.ShapeType.roundRect, { x: 0.6, y: 5.7, w: 12.1, h: 1.0, fill: { color: "FBF3F2" }, line: { color: RED, width: 1 }, rectRadius: 0.08 });
 s.addText([
   { text: "The real uncertainty is borrow economics and model accuracy.  ", options: { bold: true, color: RED } },
-  { text: "Both are swept in the one-at-a-time and joint Monte Carlo; neither breaks the strategy (P(loss)=0%), but the borrow rate is un-measured until we trade, and accuracy is what Step 3/4 must deliver. Window capped pre-COVID; short executability is gone (leg dropped).", options: { color: "27313F" } },
+  { text: "Both are swept in the one-at-a-time and joint Monte Carlo; neither breaks the strategy, but the borrow rate is un-measured until we trade, and accuracy is what Step 3/4 must deliver. Note P(loss)=0% is conditional — every MC path is from 2016-2019, so it does NOT test a different market regime (that's what the hedge is for).", options: { color: "27313F" } },
 ], { x: 0.85, y: 5.8, w: 11.6, h: 0.82, fontFace: BF, fontSize: 12.5, lineSpacingMultiple: 1.12, valign: "middle", margin: 0 });
 pageno(s, 10);
 s.addNotes("I am flagging my own weak points. Timing and costs are solid. Borrow economics and executability are assumed and could be wrong — but they are stress-tested and the strategy survives. The honest gap is a real model.");

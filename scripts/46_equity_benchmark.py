@@ -89,7 +89,7 @@ for tk, col, lab in [("^GSPC", "#2a78d6", "S&P 500"), ("XBI", "#d0803b", "XBI (b
 ax.axhline(CAP/1e6, color="gray", ls=":", lw=0.8)
 ax.set_ylabel("Equity ($M)"); ax.set_xlabel("2016 - early 2020 (capped pre-COVID)")
 ax.set_title("Strategy vs benchmarks, 10M USD start  (strategy = perfect-foresight ceiling; realistic 90% = 26M, see table)")
-ax.legend(loc="upper left", fontsize=8.5)
+ax.legend(loc="upper left", fontsize=11)
 plt.tight_layout(); fig.savefig("reports/backtest_equity.png", dpi=95, bbox_inches="tight"); plt.close(fig)
 
 import base64

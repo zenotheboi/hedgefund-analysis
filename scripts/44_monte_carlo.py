@@ -173,10 +173,10 @@ for ax, acc in zip(axes, BASELINES):
     for arr, col in [(d["bootstrap"], "#3a7d44"), (d["mc_corr"], "#d0803b")]:
         ax.axvline(np.median(arr), color=col, lw=2); ax.axvline(np.percentile(arr, 5), color=col, lw=1, ls="--")
     ax.axvline(CAP, color="#c0392f", lw=1.4, label="break-even ($10M)")
-    ax.set_ylabel("Probability density"); ax.set_title(f"Baseline model accuracy fixed at {int(acc*100)}% (long+lend)", fontsize=10)
+    ax.set_ylabel("Probability density"); ax.set_title(f"Baseline model accuracy fixed at {int(acc*100)}% (long+lend)", fontsize=12)
     if acc == BASELINES[0]:
-        ax.legend(fontsize=8, loc="upper right")
-axes[-1].set_xlabel("Final equity ($M, 10M start). Solid=median, dashed=5th pct. Purple step = un-hedged (hedge comparison).")
+        ax.legend(fontsize=10, loc="upper right")
+axes[-1].set_xlabel("Final equity ($M, 10M start).  Solid=median, dashed=5th pct.  Purple outline = un-hedged.", fontsize=11)
 fig.suptitle("Same-baseline MC (long+lend): trade vs assumption luck, hedged vs un-hedged, at 90% and 80%", y=0.995)
 plt.tight_layout(); fig.savefig("reports/backtest_montecarlo.png", dpi=95, bbox_inches="tight"); plt.close(fig)
 import base64
