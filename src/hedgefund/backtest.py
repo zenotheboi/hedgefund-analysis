@@ -51,6 +51,7 @@ class Params:
     impact_bps: float = 80               # round-trip market impact for small caps
     commission_bps: float = 5
     include_lending: bool = True         # toggle to isolate Stylianos's lending edge
+    hedge: bool = True                   # XBI beta hedge; False = un-hedged (isolate the hedge)
     trading_days_year: int = 252
 
 
@@ -78,8 +79,10 @@ def _cum_at(path, off):
 
 
 def position_pnl(event, window, notional, p: Params):
-    """Return dict: total, price_pnl, income_pnl, cost, plus daily (off, pnl) marks."""
-    beta = event["beta"]
+    """Return dict: total, price_pnl, income_pnl, cost, daily (off, pnl) marks, and
+    comp_marks = per-band cumulative marks {band: [(off, cum)]} for the stacked
+    area (bands: long_price, long_income, short_net, frictions)."""
+    beta = event["beta"] if p.hedge else 0.0     # hedge off -> no XBI subtraction
     path = _hedged_path(window, beta)
     is_long = bool(event["success"])
     frict = notional * (p.impact_bps + p.commission_bps) / 1e4
@@ -99,6 +102,7 @@ def position_pnl(event, window, notional, p: Params):
         income_pnl = income_pre + income_post
         total = price_pnl + income_pnl - frict
         marks = []
+        m_price, m_income, m_frict = [], [], []
         for o, c in path:
             if entry <= o <= exit_:
                 if o <= 0:
@@ -106,8 +110,13 @@ def position_pnl(event, window, notional, p: Params):
                 else:
                     accr = income_pre + income_post * o / max(1, post_days)
                 marks.append((o, notional * (c - r_entry) + accr - frict))
+                m_price.append((o, notional * (c - r_entry)))
+                m_income.append((o, accr))
+                m_frict.append((o, -frict))
         return {"leg": "long", "total": total, "price_pnl": price_pnl,
-                "income_pnl": income_pnl, "cost": frict, "marks": marks}
+                "income_pnl": income_pnl, "cost": frict, "marks": marks,
+                "comp_marks": {"long_price": m_price, "long_income": m_income,
+                               "frictions": m_frict}}
 
     # short leg
     entry, exit_ = p.short_entry, p.short_exit
@@ -120,21 +129,27 @@ def position_pnl(event, window, notional, p: Params):
         put_gain = notional * max(0.0, -move)
         price_pnl = put_gain - premium
         total = price_pnl - frict
-        marks = []
+        marks, m_short, m_frict = [], [], []
         for o, c in path:
             if entry <= o <= exit_:
                 mv = c - r_entry
                 marks.append((o, notional * max(0.0, -mv) - premium - frict))
+                m_short.append((o, notional * max(0.0, -mv) - premium))
+                m_frict.append((o, -frict))
         return {"leg": "short_put", "total": total, "price_pnl": price_pnl,
-                "income_pnl": 0.0, "cost": premium + frict, "marks": marks}
+                "income_pnl": 0.0, "cost": premium + frict, "marks": marks,
+                "comp_marks": {"short_net": m_short, "frictions": m_frict}}
     # borrow-and-short: gain -move, pay borrow cost
     price_pnl = notional * (-move)
     borrow_cost = notional * p.short_borrow_rate_annual * hold_days / p.trading_days_year
     total = price_pnl - borrow_cost - frict
-    marks = []
+    marks, m_short, m_frict = [], [], []
     for o, c in path:
         if entry <= o <= exit_:
             bc = borrow_cost * (o - entry) / max(1, hold_days)
             marks.append((o, notional * -(c - r_entry) - bc - frict))
+            m_short.append((o, notional * -(c - r_entry) - bc))   # short net of borrow cost
+            m_frict.append((o, -frict))
     return {"leg": "short_borrow", "total": total, "price_pnl": price_pnl,
-            "income_pnl": -borrow_cost, "cost": borrow_cost + frict, "marks": marks}
+            "income_pnl": -borrow_cost, "cost": borrow_cost + frict, "marks": marks,
+            "comp_marks": {"short_net": m_short, "frictions": m_frict}}

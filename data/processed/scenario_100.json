@@ -1,0 +1,50 @@
+{
+  "BEAR": {
+    "attrib": {
+      "long_price": 15207081.63280594,
+      "long_income": 567726.1904761893,
+      "short_net": -1639816.5213044616,
+      "frictions": -1829000.0,
+      "gross": 12305991.301977666
+    },
+    "inputs": {
+      "borrow_pct": 30.0,
+      "util_pct": 20.0,
+      "postc_pct": 5.0,
+      "short_pct": 30.0,
+      "impact_bps": 150
+    }
+  },
+  "BASE": {
+    "attrib": {
+      "long_price": 14657599.996061817,
+      "long_income": 4278968.253968252,
+      "short_net": -553337.5330056599,
+      "frictions": -1130500.0,
+      "gross": 17252730.717024412
+    },
+    "inputs": {
+      "borrow_pct": 100.0,
+      "util_pct": 40.0,
+      "postc_pct": 10.0,
+      "short_pct": 60.0,
+      "impact_bps": 80
+    }
+  },
+  "BULL": {
+    "attrib": {
+      "long_price": 14657599.996061817,
+      "long_income": 17449404.76190485,
+      "short_net": 140575.05692696886,
+      "frictions": -759000.0,
+      "gross": 31488579.814893637
+    },
+    "inputs": {
+      "borrow_pct": 200.0,
+      "util_pct": 60.0,
+      "postc_pct": 25.0,
+      "short_pct": 70.0,
+      "impact_bps": 50
+    }
+  }
+}
