@@ -1,11 +1,176 @@
 # Project Status & Handoff Notes
 
-Last updated: 2026-07-15. Read this first in any new session before
-touching code. This replaces the previous version of this file, which had
-grown into a round-by-round log of a single very long audit session —
-that detail still exists in the session transcript and the `data/interim/`
-working files if you need it, but this file states where things landed,
-not how they got there.
+Last updated: 2026-07-18. Read this first in any new session before
+touching code. The most current work is the **backtest + Monte Carlo**
+section immediately below (2026-07-17..18); the older BioPharmCatalyst
+pricing-track notes follow it. This file states where things landed, not
+how they got there — full round-by-round detail is in the session
+transcript and `data/interim/` working files.
+
+## 2026-07-17..18: Perfect-foresight backtest (README Step 2) + Monte Carlo — DONE
+
+**READ THIS FIRST if continuing the backtest.** Full detail is in the HTML
+report's backtest section; this is the handoff summary.
+
+### Two deliverables (published HTML artifacts, both self-contained)
+- **Detailed analysis report** = `reports/biopharm_car_analysis.html`
+  (artifact URL f3648041-59d2-4a22-80d5-2234b6c59629). Technical, dense,
+  small-text `section-note` paras. This is the BACKUP / detail doc.
+- **One-page IC/manager brief** = `reports/manager_brief.html`
+  (artifact URL 322c6432-5a1b-46f9-ba56-0b6cf3480023). Clean, big-type,
+  presentation-ready (Charter serif + system sans, cool-ink palette,
+  7 numbered sections, equity + MC charts embedded). THIS is the doc the
+  user presents to their manager (Stylianos). User dislikes small text in
+  the presentation doc — keep the brief clean.
+- Republish note: both arts hit a false "hasn't viewed latest version"
+  409 on republish this session; used `force:true` safely (single-session,
+  local file is the superset). To update from a NEW chat, pass the artifact
+  URL as `url=` and (if 409) `force:true`.
+
+### Pipeline (run order), all reuse the venv (`source venv/bin/activate`)
+- `scripts/40_extract_phase_outcomes.py` — parse Catalyst Description ->
+  outcome met/miss/ambiguous + phase, priority-ordered ("primary met,
+  secondary missed" = met). Fixed a real bug: "endpoints not met" was tagged
+  met via `\bmet\b`. Output `data/interim/40_phase_outcomes.csv`.
+- `scripts/41_price_expanded_universe.py` — bulk yfinance download + market
+  model CAR (trimmed alpha/beta) over an extended **T-25..T+65** window (the
+  63-day lending hold needs it). LENIENT small-mol filter (drop only
+  PubChem-CONFIRMED biologics; keep unresolved dev-codes — strict filter
+  discarded ~800 Phase 2/3 events for unindexed codes). Output
+  `data/processed/backtest_events.csv` (762 priced events) +
+  `backtest_windows.json` (per-event daily window).
+- `src/hedgefund/backtest.py` — `Params` dataclass + `position_pnl()`. Two
+  legs; beta-hedged via per-name `sr - beta*br` (no compounded-alpha bug).
+  Borrow income is TWO-PHASE: full rate pre-catalyst, `post_collapse_frac`
+  x rate post-catalyst. Short via "borrow" or "put".
+- `scripts/42_run_backtest.py` — event-driven $10M portfolio sim. **Window
+  restricted to 2016-2019** (`YEAR_MIN/YEAR_MAX`) because 2014-15 & 2020 were
+  too sparse (16 of 336 events; equity flat there). Runs naive ceiling,
+  realistic, no-lending, put-mode, borrow-rate x util sweep, accuracy
+  degradation, by-year regime. Output `backtest_results.json` + equity.png +
+  sensitivity.png + sample_by_year.png.
+- `scripts/43_sensitivity.py` — one-at-a-time tornado (every param, with
+  units in labels), bear/base/bull scenarios, regime. Also 2016-2019. Output
+  `backtest_sensitivity.json` + tornado.png.
+- `scripts/44_monte_carlo.py` — same-baseline decomposition at 90% & 80%
+  accuracy: (A) bootstrap over trades (pooled over 8 books) = trade luck,
+  (B1) independent + (B2) Gaussian-copula MC over the 5 cost assumptions =
+  assumption luck, plus a supplementary full-risk MC (accuracy also random).
+  Output `backtest_montecarlo.json` + montecarlo.png (2-panel).
+
+### Decisive finding — signal is SMALL-CAP ONLY
+By market-cap tier, failures: small-cap CRL -18%, P2miss -11%, P3miss -15%
+vs large-cap ALL ~-0.5% (one failed trial is immaterial to big pharma).
+Successes: small-cap Phase 2/3 met +3% event/+5-6% hold; approvals weaker
+(priced in). Both legs gate to `tier=small`. 2016-2019 small-cap universe =
+320 events (~105 fail / ~215 success).
+
+### The strategy (correct framing — an earlier framing was WRONG, see below)
+- **Profit is LONG-side**: long the predicted SUCCESSES and LEND the shares
+  to the crowd that (wrongly, ~90% base rate) shorts them -> collect high
+  borrow fees + the price rise. Lending income is the differentiator.
+- **Short leg (predicted failures) nets ~FLAT** after honest borrow limits
+  (the biggest-drop names are un-borrowable) — it is a hedge, not a profit
+  center. EARLIER WRONG FRAMING said "the money is in predicting failure /
+  the short leg"; corrected everywhere to: money is long+lend, failure-class
+  precision matters to AVOID longing a landmine (a misclassified failure you
+  go long crashes -15%).
+
+### Headline numbers (2016-2019, realistic case — QUOTE THESE, not the ceiling)
+- **$10M -> $27.3M, +173%, CAGR 26%, Sharpe 1.67, maxDD -15%.**
+- Naive ceiling (flat borrow, random gate): $41.4M / Sharpe 2.55 — DO NOT quote.
+- **Price-only vs full (proves lending adds value):** same strict gate,
+  no lending = **$23.0M**; with lending = **$27.3M** -> lending adds **+19%**.
+- P&L by leg (gross ~$15.4M): long price +$14.7M, lending +$4.3M, short net
+  ~-$0.6M, frictions -$3.0M. Long-and-lend ~95% of gross.
+- 2014-2020 vs 2016-2019: FINAL $ barely changed ($26.8M->$27.3M) because the
+  excluded years were nearly empty; but CAGR jumped 17%->26% (4 yrs not 6)
+  and Sharpe 1.26->1.67 (removed the dead flat years). This VALIDATES the
+  restriction (no profit lost, real annualized speed revealed).
+
+### The two realism fixes (after a strategy-analyst self-critique)
+1. **borrow-income time-shape**: `post_collapse_frac=0.10` — lending income
+   collapses once the catalyst resolves (shorts cover). Cut lending $14.4M->$4.3M.
+2. **non-random executability gate**: `short_gate_mode="worst_first"` — drop
+   the biggest-drop (hardest-to-borrow) shorts, not a random 40%. Cut short
+   P&L $6.2M->$1.3M.
+
+### Monte Carlo (backtest_montecarlo.json) — REBUILT 2026-07-30 (same-baseline + copula)
+Model accuracy (the dominant driver) is now HELD FIXED at a common baseline
+(90% and 80%) across all tests, so trade-luck vs assumption-luck is
+apples-to-apples. Accuracy itself is analysed separately via the script-43
+sweep (not blended in). Assumptions drawn both independently AND correlated
+(Gaussian single-factor copula: a liquidity-stress factor makes borrow
+pricier / utilization lower / shorting harder / impact higher together).
+Bootstrap now pools per-trade P&L over 8 degraded books so it isolates PURE
+trade-selection luck (not one lucky/unlucky mislabel draw).
+
+At **90% accuracy** (all three cluster — result is robust to both luck types):
+- A. Trade luck (bootstrap): median $23.2M, CI [$16.8M, $30.3M], P(loss) 0%
+- B1. Assumptions independent: $23.6M, [$17.7M, $30.2M], 0%
+- B2. Assumptions correlated: $23.7M, [$17.9M, $29.5M], 0%
+At **80% accuracy**:
+- A. Trade luck: $18.7M, [$12.1M, $25.9M], 1.5%
+- B1. independent: $18.8M, [$12.3M, $26.0M], 1.0%
+- B2. correlated: $18.9M, [$12.4M, $25.0M], 1.5%
+Supplementary **full-risk** (accuracy also random 70-100% + correlated):
+median $21.4M, CI [$11.3M, $29.4M], P(loss) 3.7%.
+
+Read: (1) at a fixed accuracy, trade luck ≈ assumption luck (both ~$23M @90%,
+~$19M @80%, near-identical spreads) → not a few lucky deals nor lucky cost
+guesses. (2) Correlation matters MILDLY — copula trims the upside (90% CI top
+$29.5M vs $30.2M indep) and lifts P(loss) a touch (80%: 1.5% vs 1.0%); the
+downside does NOT blow out. (3) The lever that dominates is model accuracy,
+which is exactly why it gets its own axis (the sweep).
+- **RESOLVED** (was the open common-baseline item): all tests now at a shared
+  90%/80% accuracy. Correlation/copula implemented (not deferred).
+- Tornado (script 43) now plots the TOP 5 drivers individually and folds the
+  remaining 4 into one grey "others (immaterial)" bar.
+
+### Assumptions & confidence (what a manager will interrogate)
+- Grounded in our data: entry/exit timing (long T-20/T+63, short T-10/T+5).
+- Market convention: costs (80 bps impact + 5 bps commission).
+- Reasonable/swept: sizing (5%/position, 10%/ticker, 150% gross -> up to ~30
+  concurrent positions).
+- **Assumed, NO data (the real risk)**: borrow rate (100%/yr), utilization
+  (40%), executability (keep 60%). All swept.
+- Ceiling-only: model accuracy 100% (Step 2). Borrow fee formula (per $1M,
+  100%/yr, 40% util): pre = 1M*1.0*0.4*20/252*1.0 = $31.7k; post =
+  1M*1.0*0.4*63/252*0.10 = $10k; total $41.7k (4.2%).
+
+### Capacity / positioning
+Illiquid small-caps cap AUM at ~$50-150M -> run as an UNCORRELATED SLEEVE
+inside a bigger book, not a standalone flagship. Best risk-adjusted year is
+the 2016 biotech crash (Sharpe 1.93) because the book is beta-hedged =
+crisis-alpha, the strongest allocator pitch.
+
+### NOT yet done / next
+- **README Steps 3-4**: BUILD the real predictive model and MEASURE its true
+  accuracy (esp. failure-class precision/recall). We only STRESS-TESTED a
+  70-100% accuracy range; we have not built the model. This is THE deciding
+  step.
+- Standard HF methods still missing (discussed, not built): out-of-sample /
+  walk-forward validation (entry windows are in-sample fit); realized
+  beta/correlation to XBI (claim market-neutral, never measured it); factor
+  attribution; VaR/CVaR/Calmar/rolling-Sharpe; ADV-based transaction costs;
+  proper capacity curve (return vs AUM); borrow modeled from float/short-int
+  instead of a flat 60% gate.
+- The common-baseline MC re-run (see MC OPEN item above).
+
+### English manager-presentation speech
+A ~5-min plain-language script (opening question -> finding -> where-the-money
+-is [long+lend] -> hedge -> how tested -> numbers -> robustness -> limits ->
+ask) was written in chat this session (not saved to a file). Regenerate or
+ask the user for it if needed.
+
+### Git state (as of this handoff)
+Branch `gigi`, remote `zenotheboi/hedgefund-analysis`. Upstream PR #1
+(zenotheboi:main -> SteliosKyriacou:main, "Prototype 1..."). Fork PRs #2/#3
+merged. **Everything from this backtest+MC session (scripts 40-44,
+src/hedgefund/backtest.py, both reports, README "Using this repo" section,
+this STATUS.md) is UNCOMMITTED.** No Claude co-author trailer per user
+preference. `.claude/launch.json` exists (jupyter-lab + report-preview
+servers). `Untitled.ipynb` is a stray file — do not commit.
 
 ## 2026-07-15 pivot: BioPharmCatalyst data source (active track)
 

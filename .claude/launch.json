@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jupyter-lab",
+      "runtimeExecutable": "venv/bin/jupyter-lab",
+      "runtimeArgs": ["--port=8888", "--no-browser", "--ServerApp.token=", "--ServerApp.password="],
+      "port": 8888
+    },
+    {
+      "name": "report-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8000", "--directory", "reports"],
+      "port": 8000
+    }
+  ]
+}
