@@ -1,11 +1,55 @@
 # Project Status & Handoff Notes
 
-Last updated: 2026-07-18. Read this first in any new session before
-touching code. The most current work is the **backtest + Monte Carlo**
-section immediately below (2026-07-17..18); the older BioPharmCatalyst
-pricing-track notes follow it. This file states where things landed, not
+Last updated: 2026-08-05. Read this first in any new session before
+touching code. The most current work is the **presentation re-baseline +
+manager-requested analyses** section immediately below; the backtest +
+Monte Carlo section follows it. This file states where things landed, not
 how they got there — full round-by-round detail is in the session
 transcript and `data/interim/` working files.
+
+## 2026-08-05: Deck re-baseline for manager review (project = "Alpha Forge") — IN PROGRESS
+
+**Deployed strategy is LONG + LEND** (short leg tested & dropped). Headline is
+the realistic **90%-model** result **$26.3M / 27% / Sharpe 1.47 / -18% maxDD**
+(perfect-foresight ceiling $28.9M), 2016-2019 small-cap, capped pre-COVID.
+
+### Manager-requested analyses — DONE this session
+- **Price-vs-lending 80/20 VALIDATED** (`scripts/48_per_trade_breakdown.py`,
+  `data/processed/price_vs_lending.json`): of total profit, **price = 77%
+  ($14.6M), lending = 23% ($4.3M)** at 100% accuracy. Note "lending adds +18%
+  final-equity uplift" and "lending is 23% of profit" are DIFFERENT numbers —
+  the manager means the 23% share. Proof chart = `reports/per_trade_breakdown.png`
+  (Stylianos's per-trade format). Key insight: **90 of 208 trades had negative
+  price P&L** (successes that drifted down) — lending is a steady positive that
+  cushions them. At a realistic 90% model, lending's share RISES (price gets
+  riskier), so lending is a stabilizer.
+- **Events-per-year chart** `reports/events_per_year.png` (green successes / red
+  failures): 2016=19/13, 2017=64/28, 2018=52/31, 2019=82/31; total 217/103.
+- **Scalability / capacity RESEARCHED** (`scripts/49_scalability.py`,
+  `data/processed/scalability.json`): pulled real 2016-2019 daily $ volume for
+  88/91 long tickers. Median ADV **$3.3M** (25th pct $0.5M, 75th $12M). At a
+  5%-of-capital position and ~1-2x one day's volume, **AUM cap ~$67M-$134M on
+  the median name -> ~$100M is a defensible soft cap** (matches the manager's
+  estimate). BUT the illiquid quartile ($0.5M ADV) caps at only $10-21M, so
+  above ~$100M you shed the thinnest names and impact costs erode the edge.
+  Deployable range **$50-150M; ~$100M central**.
+
+### TODO / deferred action items (NOT yet done)
+- **Approval-to-price rework**: re-run the pre-strategy approval-to-price
+  correlation analysis using the STRATEGY's holding window (T-20 -> T+63)
+  instead of the ad-hoc window. Auxiliary/Q&A slide. (Stylianos request.)
+- **Hedge-fund intro figures**: draft the "what is a hedge fund" slide content
+  for a non-finance audience, incl. best-vs-average hedge-fund annual returns
+  (e.g. HFRI composite ~single digits vs top funds double digits) — external
+  figures, flag to verify before presenting.
+- **Deck restructure**: rebuild the .pptx toward the team's agreed flow
+  (Motivation -> What is a hedge fund -> Assumptions+events chart -> Strategy
+  selection -> Monte Carlo -> Results incl. per-trade 80/20 -> Sizing &
+  scalability), renamed **Alpha Forge**; 7 slides is a proxy, MORE slides OK,
+  clarity is the priority. Keep aux slides (hedge methodology, pre-strategy
+  analysis) at the back for Q&A. Also validate price-only vs market and
+  re-confirm the trade-luck bootstrap baseline (believed already fixed).
+- New charts to place: `events_per_year.png`, `per_trade_breakdown.png`.
 
 ## 2026-07-17..18: Perfect-foresight backtest (README Step 2) + Monte Carlo — DONE
 
