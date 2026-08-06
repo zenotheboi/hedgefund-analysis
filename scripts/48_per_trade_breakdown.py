@@ -71,13 +71,14 @@ print(f"price-losing trades cushioned by lending: {(td.price<0).sum()} trades ha
 
 fig, ax = plt.subplots(figsize=(13, 5.5)); ax.set_facecolor("#111318"); fig.set_facecolor("#111318")
 xi = np.arange(len(td))
-ax.bar(xi, td.price, color="#e0455e", label="Stock return (price gain/loss)")
-ax.bar(xi, td.lending, bottom=np.where(td.price > 0, td.price, 0), color="#2ec4a6", label="Lending income")
-# where price negative, lending should stack from price upward
+# Two colours = two SOURCES OF PROFIT (not profit/loss). Stock return can still
+# go below zero (bar dips under the line); lending is always a positive add-on.
+ax.bar(xi, td.price, color="#4f8ff7", label="From stock price move")
+ax.bar(xi, td.lending, bottom=np.where(td.price > 0, td.price, 0), color="#e0a458", label="From lending fees")
 neg = td.price < 0
-ax.bar(xi[neg], td.lending[neg], bottom=td.price[neg], color="#2ec4a6")
-ax.scatter(xi, td.net, color="white", s=6, zorder=5, label="Net trade profit")
-ax.axhline(0, color="#8a919b", lw=0.8)
+ax.bar(xi[neg], td.lending[neg], bottom=td.price[neg], color="#e0a458")
+ax.scatter(xi, td.net, color="white", s=7, zorder=5, label="Net profit (this trade)")
+ax.axhline(0, color="#c7ccd2", lw=1.0)
 for s in ax.spines.values(): s.set_color("#3a4048")
 ax.tick_params(colors="#c7ccd2"); ax.yaxis.label.set_color("#c7ccd2"); ax.xaxis.label.set_color("#c7ccd2")
 ax.set_xlabel("Trade index (chronological)"); ax.set_ylabel("Profit / loss ($M)")

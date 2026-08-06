@@ -9,3 +9,4 @@ data/interim/
 
 # throwaway base64 intermediates (embedded directly in the HTML report)
 reports/*_b64.txt
+node_modules/
