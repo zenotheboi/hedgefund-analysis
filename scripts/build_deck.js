@@ -194,27 +194,34 @@ s.addText([{text:"Floor $16.3M (no skill)  ·  Realistic $22.3M (90% model)  · 
 pageno(s,10);
 s.addNotes("Fair challenge: do you even need a fancy model, or are you just riding a good biotech market? So we tested the dumbest version - no model, just buy EVERY catalyst and lend. Even that makes $16M at the realistic 56% rate, because winners still slightly outnumber losers - about 1.3 to 1, not a huge edge - and lending pays on all of them. Add a decent 90% model and you get $22M, so the model is worth about 40% more. BUT - and this is important, someone will push on it - that no-model floor is fragile. It only works because 2016 to 2019 was a friendly period; in a worse market or with more failures, buying everything would lose. So I would NOT promise 'you can't lose by buying everything' - that's not true in general. The real value of the model is two things: it lifts the return, and it keeps the whole thing standing when winners get rare - which is exactly the next slide.");
 
-// 11 MONTE CARLO (NEW)
+// 11 MONTE CARLO
 s=p.addSlide(); s.background={color:WHITE};
-head(s,"10","Monte Carlo - how much do our guesses matter?","We don't know the exact borrow rate, utilization, etc. So we rolled the dice 500 times.");
-s.addText("We drew the uncertain cost assumptions at random and re-ran the strategy 500 times (56% universe, 90% model):",
- {x:0.6,y:1.65,w:12.1,h:0.5,fontFace:BF,fontSize:14,color:NAVY,bold:true});
-const mh=(t)=>({text:t,options:{fontFace:BF,fontSize:12.5,bold:true,color:WHITE,fill:NAVY,align:"center",valign:"middle"}});
-const md=(t,o={})=>({text:t,options:{fontFace:BF,fontSize:12.5,color:INKT,align:o.align||"center",valign:"middle",...o}});
-s.addTable([[{...mh("Varied at random"),options:{...mh("").options,align:"left"}},mh("Typical (median)"),mh("90% of outcomes"),mh("Lose money?")],
- [md("Borrow rate, utilization,",{align:"left"}),md("$22M",{bold:true,color:MINT}),md("$18M - $27M"),md("0%",{bold:true,color:MINT})],
- [md("post-event fade, trading cost",{align:"left",color:MUTED}),md("22% / yr",{}),md("(never below $10M start)"),md("in the sims",{color:MUTED})]],
- {x:0.6,y:2.25,w:12.1,colW:[4.3,2.6,3.4,1.8],rowH:0.6,border:{type:"solid",color:LINE,pt:1},valign:"middle"});
-s.addShape(p.ShapeType.roundRect,{x:0.6,y:4.0,w:5.9,h:1.7,fill:{color:"F0FAF6"},line:{color:MINT,width:1},rectRadius:0.08});
-s.addText("The good news",{x:0.85,y:4.12,w:5.4,h:0.3,fontFace:HF,fontSize:14,bold:true,color:MINT,margin:0});
-s.addText("Even in the unlucky 5% of runs it still ends around $18M - well above the $10M we started with. The cost assumptions don't make or break it.",
- {x:0.85,y:4.48,w:5.4,h:1.1,fontFace:BF,fontSize:12.5,color:INKT,valign:"top",margin:0});
-s.addShape(p.ShapeType.roundRect,{x:6.75,y:4.0,w:5.95,h:1.7,fill:{color:"FBF7EE"},line:{color:GOLD,width:1},rectRadius:0.08});
-s.addText("The catch",{x:7.0,y:4.12,w:5.5,h:0.3,fontFace:HF,fontSize:14,bold:true,color:"9A6A12",margin:0});
-s.addText("This only shuffles the cost guesses, not the market. Every run uses 2016-2019 prices - so \"0% lose\" means in a market like that one. Model accuracy is tested separately (next slide).",
- {x:7.0,y:4.48,w:5.5,h:1.15,fontFace:BF,fontSize:12.5,color:INKT,valign:"top",margin:0});
+head(s,"10","Monte Carlo - do our assumption-guesses break it?","Hold model accuracy fixed; roll the uncertain cost assumptions 500 times (56% universe).");
+// setup: held fixed vs drawn at random
+s.addShape(p.ShapeType.roundRect,{x:0.6,y:1.6,w:5.95,h:1.55,fill:{color:"F4F6FC"},line:{color:LINE,width:1},rectRadius:0.08});
+s.addText("HELD FIXED (the baseline)",{x:0.8,y:1.7,w:5.5,h:0.3,fontFace:BF,fontSize:11,bold:true,color:MUTED,charSpacing:1,margin:0});
+s.addText("Model accuracy 90% (then 80%)\nPosition size 5%, ~30 names, timing\n(our design choices)",
+ {x:0.8,y:2.05,w:5.5,h:1.0,fontFace:BF,fontSize:12.5,color:INKT,lineSpacingMultiple:1.15,valign:"top",margin:0});
+s.addShape(p.ShapeType.roundRect,{x:6.75,y:1.6,w:5.95,h:1.55,fill:{color:"F0FAF6"},line:{color:MINT,width:1},rectRadius:0.08});
+s.addText("DRAWN AT RANDOM each run",{x:6.95,y:1.7,w:5.5,h:0.3,fontFace:BF,fontSize:11,bold:true,color:"0A8F6E",charSpacing:1,margin:0});
+s.addText("Borrow rate 25-250%/yr · Utilization 20-60%\nPost-event fade 5-25% · Trading cost 40-150 bps\n(the 4 market unknowns)",
+ {x:6.95,y:2.05,w:5.5,h:1.0,fontFace:BF,fontSize:12.5,color:INKT,lineSpacingMultiple:1.15,valign:"top",margin:0});
+// results table 90/80 x independent/correlated + precision
+const mh=(t)=>({text:t,options:{fontFace:BF,fontSize:12,bold:true,color:WHITE,fill:NAVY,align:"center",valign:"middle"}});
+const md=(t,o={})=>({text:t,options:{fontFace:BF,fontSize:12,color:INKT,align:o.align||"center",valign:"middle",...o}});
+s.addTable([[{...mh("What varies (accuracy fixed)"),options:{...mh("").options,align:"left"}},mh("90% model - precision 92%"),mh("80% model - precision 84%")],
+ [md("Assumptions drawn independently",{align:"left"}),md("$21.9M  [18.0, 27.8]"),md("$19.8M  [15.7, 25.6]")],
+ [md("Assumptions correlated (all hit at once)",{align:"left",bold:true,color:NAVY}),md("$21.7M  [18.4, 26.6]",{bold:true}),md("$19.5M  [15.4, 24.3]",{bold:true})],
+ [md("Chance of losing money (in the sims)",{align:"left",italic:true}),md("0%",{bold:true,color:MINT}),md("0%",{bold:true,color:MINT})]],
+ {x:0.6,y:3.35,w:12.1,colW:[4.9,3.6,3.6],rowH:0.55,border:{type:"solid",color:LINE,pt:1},valign:"middle"});
+s.addText([{text:"Read: ",options:{bold:true,color:NAVY}},
+ {text:"a typical run makes ~$22M; even the unlucky 5% stays ~$18M, above the $10M start. Correlating the assumptions (a stress regime hits all at once) barely trims it. So the cost guesses don't break it. ",options:{color:INKT}},
+ {text:"Caveat: every run uses 2016-2019 prices, so \"0% loss\" means in a market like that one.",options:{bold:true,color:"9A6A12"}}],
+ {x:0.6,y:5.75,w:12.1,h:0.85,fontFace:BF,fontSize:13,lineSpacingMultiple:1.15,valign:"top"});
+s.addText("Precision (in the header) = when the model says \"success,\" how often it's right; 92% here because we're at the realistic 56% base rate (next slide).",
+ {x:0.6,y:6.68,w:12.1,h:0.35,fontFace:BF,fontSize:11,italic:true,color:MUTED});
 pageno(s,11);
-s.addNotes("This is the uncertainty slide - it answers 'your assumptions are guesses, so how fragile is this?' A few of our inputs we genuinely don't know - the borrow rate, how much of the position is actually on loan, the trading cost. So instead of guessing once, we drew them at random and re-ran the whole strategy 500 times. The result: a typical run makes $22M, and 90% of runs land between $18M and $27M, and importantly none of them lose money - even the unlucky 5% still ends around $18M, well above the $10M we started with. So the takeaway on the left: our cost guesses don't make or break it. The catch on the right, and I'll be upfront: this only shuffles the COST assumptions - every run still uses 2016 to 2019 prices, so '0% lose' means in a market like that one, not a guarantee. The model-accuracy question is separate, and that's the next slide - which is the real risk.");
+s.addNotes("This is the uncertainty slide, and it follows a specific structure. First, the setup up top: we HOLD the model accuracy fixed - at 90%, then 80% - and we hold our own design choices fixed, like sizing and timing. What we DRAW AT RANDOM are the four things we genuinely don't know: the borrow rate, utilization, the post-event fade, and trading cost - each over a wide range. Then we re-ran the strategy 500 times. The table: at a 90% model the typical run makes about $22M, with 90% of runs between $18M and $27M; at 80% it's about $19.5M. We draw the assumptions two ways - independently, and correlated, meaning a bad-liquidity regime hits all of them at once - and even correlated it barely moves. Crucially, zero runs lose money. Note the header says 'precision 92%' - that's how often the model's 'success' call is actually right, and it's high because we're at the realistic 56% base rate, which is the next slide. The honest caveat: this only shuffles the cost guesses; every run still uses 2016-2019 prices, so '0% loss' means in a market like that one.");
 
 // 12 PRECISION
 s=p.addSlide(); s.background={color:WHITE};
