@@ -1,11 +1,51 @@
 # Project Status & Handoff Notes
 
-Last updated: 2026-08-05. Read this first in any new session before
-touching code. The most current work is the **presentation re-baseline +
-manager-requested analyses** section immediately below; the backtest +
-Monte Carlo section follows it. This file states where things landed, not
-how they got there — full round-by-round detail is in the session
-transcript and `data/interim/` working files.
+Last updated: 2026-08-06. Read this first. Newest state in the
+**2026-08-06 FINAL DECK** section right below; older sections follow.
+
+## 2026-08-06: FINAL — presentation deck done; HTML reports still TODO
+
+**Deliverable = `reports/Biotech_Catalyst_Strategy_Deck.pptx`** (20 slides,
+16 main + appendix divider + 3 appendix; conversational speaker notes on every
+slide). Generator: `scripts/build_deck.js` (auto-numbers sections/pages; run
+`node scripts/build_deck.js` — pptxgenjs installed locally, node_modules
+gitignored). Title = "Biotech Clinical-Catalyst Strategy"; **"Alpha Forge" = the
+predictive MODEL to build next**, NOT the deck/strategy name.
+
+**Strategy = LONG + LEND** (buy predicted small-cap winners, rent shares to the
+crowd shorting them). Short leg TESTED & DROPPED. Hedge (XBI) optional.
+
+**Locked numbers:**
+- Raw backtest (68% data, 90% model): **$26.3M / 27% CAGR** (headline, kept raw)
+- Selection-bias-adjusted **56%** (phase-weighted realistic rate) 90% model:
+  **$22.3M / 22% / Sharpe ~1.5 / -18% maxDD / 0% loss** — the "honest" number
+- 100% ceiling@56% $24.9M · no-model floor $16.3M · price-only@56% $18.7M -> lending +19%
+- Profit split: **stock ~77% / lending ~23%**; 90 of 208 trades lost on price (lending cushions)
+- MC@56%/90%: indep $21.9M[18.0,27.8], corr $21.7M[18.4,26.6], 0% loss; **borrow rate = top driver** (OAT)
+- Precision@56%: 90% model->92% (vs 50% at a 10% base rate = the base-rate trap)
+- Capacity **~$100M** (median ADV $3.3M; ~16-32 concurrent; 5% sizing)
+- Sample 320 = 217 win + 103 fail; phases P3 139 / P2 106 / Reg 75
+- winners:losers ratio 2.1:1 at 68% but **~1.3:1 at 56%**; 208 traded of 217 (9 capacity-skipped)
+
+**56% = phase-weighted blend** (P2 ~32%, P3 ~58%, Reg ~87% real rates x our mix),
+built by RESAMPLING the universe to 56% success (scripts 51-53). Bootstrap
+"trade luck" DROPPED (kept only assumption MC indep+correlated). Equity at 56%
+is a widening FAN vs 68%, not a parallel shift.
+
+**New scripts this arc:** 48 (per-trade 80/20 + events/yr chart), 49 (scalability
+ADV), 50 (no-model floor), 51 (base-rate/precision), 52 (realistic 56% blend),
+53 (56% MC). Charts: events_per_year, per_trade_breakdown, backtest_equity (56%
+strategy vs benchmarks), equity_56_vs_68 (fan), oat_mc_56 (tornado).
+
+**OUTSTANDING — Task 18 (NOT started):** bring the two HTML reports
+(`reports/manager_brief.html`, `reports/biopharm_car_analysis.html`) in line with
+the deck — they're still on the OLD 68% numbers with the bootstrap MC. Need:
+56% adjustment section, per-trade + winners/losers, precision/base-rate, no-model
+floor, scalability, MC (drop bootstrap), leg-split at 56%, new equity chart. Keep
+raw 68% as headline there too.
+
+---
+[older sections below]
 
 ## 2026-08-05: Deck re-baseline for manager review (project = "Alpha Forge") — IN PROGRESS
 
